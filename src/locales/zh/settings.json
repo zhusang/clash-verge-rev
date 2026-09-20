@@ -25,6 +25,10 @@
         "tunMode": {
           "autoDisabled": "由于服务不可用，TUN 模式已自动关闭",
           "autoDisableFailed": "自动关闭 TUN 模式失败"
+        },
+        "exclusive": {
+          "systemProxyAutoDisabled": "已开启虚拟网卡模式，系统代理已自动关闭",
+          "tunModeAutoDisabled": "已开启系统代理，虚拟网卡模式已自动关闭"
         }
       }
     },

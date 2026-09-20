@@ -25,6 +25,10 @@
         "tunMode": {
           "autoDisabled": "由於服務不可使用，虛擬網路介面卡模式已自動停用",
           "autoDisableFailed": "自動停用虛擬網路介面卡模式失敗"
+        },
+        "exclusive": {
+          "systemProxyAutoDisabled": "已開啟虛擬網路介面卡模式，系統代理已自動停用",
+          "tunModeAutoDisabled": "已開啟系統代理，虛擬網路介面卡模式已自動停用"
         }
       }
     },

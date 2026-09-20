@@ -154,7 +154,16 @@ const ProxyControlSwitches = ({
       showErrorNotice(msgKey)
       throw new Error(t(msgKey))
     }
-    mutateVerge({ ...verge, enable_tun_mode: value }, false)
+    mutateVerge(
+      {
+        ...verge,
+        enable_tun_mode: value,
+        // System proxy and TUN mode are mutually exclusive. The backend turns
+        // system proxy off; mirror it here so the other switch reacts at once.
+        ...(value ? { enable_system_proxy: false } : {}),
+      },
+      false,
+    )
     await patchVerge({ enable_tun_mode: value })
   }
 

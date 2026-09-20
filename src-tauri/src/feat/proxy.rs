@@ -1,9 +1,10 @@
 use crate::{
     config::{Config, IVerge},
-    core::handle,
+    core::{handle, service},
 };
 use clash_verge_logging::{Type, logging};
 use std::env;
+use tauri_plugin_clash_verge_sysinfo::is_current_app_handle_admin;
 use tauri_plugin_clipboard_manager::ClipboardExt as _;
 
 /// Toggle system proxy on/off
@@ -42,11 +43,30 @@ pub async fn toggle_system_proxy() -> bool {
     }
 }
 
+/// TUN mode needs either an elevated process or the running service.
+async fn is_tun_mode_available() -> bool {
+    is_current_app_handle_admin(handle::Handle::app_handle()) || service::is_service_available().await.is_ok()
+}
+
 /// Toggle TUN mode on/off
 /// Returns the updated toggle state
 pub async fn toggle_tun_mode(not_save_file: Option<bool>) -> bool {
     let current = Config::verge().await.latest_arc().enable_tun_mode.unwrap_or(false);
     let enable = !current;
+
+    // The tray menu item and the frontend switch are already disabled when TUN
+    // cannot run; hotkeys have no such guard. Without this check, enabling TUN
+    // would first force system proxy off, then TUN would be auto-disabled by the
+    // frontend, leaving the user with neither.
+    if enable && !is_tun_mode_available().await {
+        logging!(
+            warn,
+            Type::ProxyMode,
+            "TUN mode is unavailable (requires admin or service), ignoring toggle",
+        );
+        handle::Handle::notice_message("proxy_mode::tun_unavailable", "");
+        return current;
+    }
 
     match super::patch_verge(
         &IVerge {

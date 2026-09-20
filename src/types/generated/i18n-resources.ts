@@ -1196,6 +1196,10 @@ export interface TranslationResources {
             silentStart: string
           }
           notifications: {
+            exclusive: {
+              systemProxyAutoDisabled: string
+              tunModeAutoDisabled: string
+            }
             tunMode: {
               autoDisabled: string
               autoDisableFailed: string

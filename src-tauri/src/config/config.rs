@@ -68,35 +68,7 @@ impl Config {
         let verge = Self::verge().await.latest_arc();
         clash_verge_i18n::sync_locale(verge.language.as_deref());
 
-        // init Tun mode
-        let handle = Handle::app_handle();
-        let is_admin = is_current_app_handle_admin(handle);
-        let is_tun_enabled = verge.enable_tun_mode.unwrap_or(false);
-        let is_service_available = if is_tun_enabled && !is_admin {
-            #[cfg(target_os = "windows")]
-            {
-                service::wait_for_service_available_on_startup().await.is_ok()
-            }
-            #[cfg(not(target_os = "windows"))]
-            {
-                service::is_service_available().await.is_ok()
-            }
-        } else {
-            true
-        };
-
-        if is_tun_enabled && !is_admin && !is_service_available {
-            let verge = Self::verge().await;
-            verge.edit_draft(|d| {
-                d.enable_tun_mode = Some(false);
-            });
-            verge.apply();
-            let _ = tray::Tray::global().update_menu().await;
-
-            // 分离数据获取和异步调用避免Send问题
-            let verge_data = Self::verge().await.latest_arc();
-            logging_error!(Type::Core, verge_data.save_file().await);
-        }
+        Self::reconcile_proxy_modes_on_startup(&verge).await;
 
         let validation_result = Self::generate_and_validate().await?;
 
@@ -112,6 +84,64 @@ impl Config {
         }
 
         Ok(())
+    }
+
+    /// Normalize the persisted proxy mode switches before the core starts.
+    ///
+    /// TUN mode is turned off when it cannot run (not admin and the service is
+    /// unavailable). System proxy and TUN mode are mutually exclusive, so when
+    /// both survived in `verge.yaml` and TUN is usable, TUN wins and system
+    /// proxy is turned off. Either way the result is written back to disk.
+    async fn reconcile_proxy_modes_on_startup(verge: &IVerge) {
+        if !verge.enable_tun_mode.unwrap_or(false) {
+            return;
+        }
+
+        let is_admin = is_current_app_handle_admin(Handle::app_handle());
+        let is_tun_available = is_admin || {
+            #[cfg(target_os = "windows")]
+            {
+                service::wait_for_service_available_on_startup().await.is_ok()
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                service::is_service_available().await.is_ok()
+            }
+        };
+
+        let sysproxy_enabled = verge.enable_system_proxy.unwrap_or(false);
+        if is_tun_available && !sysproxy_enabled {
+            return;
+        }
+
+        if is_tun_available {
+            logging!(
+                info,
+                Type::Core,
+                "System proxy and TUN mode were both enabled on startup, keeping TUN and turning system proxy off",
+            );
+        } else {
+            logging!(
+                warn,
+                Type::Core,
+                "TUN mode is unavailable on startup (not admin and service unavailable), turning it off",
+            );
+        }
+
+        let draft = Self::verge().await;
+        draft.edit_draft(|d| {
+            if is_tun_available {
+                d.enable_system_proxy = Some(false);
+            } else {
+                d.enable_tun_mode = Some(false);
+            }
+        });
+        draft.apply();
+        let _ = tray::Tray::global().update_menu().await;
+
+        // 分离数据获取和异步调用避免Send问题
+        let verge_data = Self::verge().await.latest_arc();
+        logging_error!(Type::Core, verge_data.save_file().await);
     }
 
     // Ensure "Merge" and "Script" profile items exist, adding them if missing.

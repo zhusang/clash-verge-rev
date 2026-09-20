@@ -25,6 +25,10 @@
         "tunMode": {
           "autoDisabled": "حالت TUN به دلیل عدم دسترسی به سرویس، به طور خودکار غیرفعال می‌شود",
           "autoDisableFailed": "غیرفعال کردن خودکار حالت TUN ناموفق بود"
+        },
+        "exclusive": {
+          "systemProxyAutoDisabled": "System proxy was turned off because TUN mode is enabled",
+          "tunModeAutoDisabled": "TUN mode was turned off because system proxy is enabled"
         }
       }
     },

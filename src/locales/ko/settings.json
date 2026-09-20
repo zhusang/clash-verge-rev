@@ -25,6 +25,10 @@
         "tunMode": {
           "autoDisabled": "서비스를 사용할 수 없어 TUN 모드가 자동으로 비활성화되었습니다",
           "autoDisableFailed": "TUN 모드를 자동으로 비활성화하지 못했습니다"
+        },
+        "exclusive": {
+          "systemProxyAutoDisabled": "System proxy was turned off because TUN mode is enabled",
+          "tunModeAutoDisabled": "TUN mode was turned off because system proxy is enabled"
         }
       }
     },

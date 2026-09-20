@@ -25,6 +25,10 @@
         "tunMode": {
           "autoDisabled": "Режим TUN автоматически отключен: служба недоступна",
           "autoDisableFailed": "Не удалось автоматически отключить режим TUN"
+        },
+        "exclusive": {
+          "systemProxyAutoDisabled": "System proxy was turned off because TUN mode is enabled",
+          "tunModeAutoDisabled": "TUN mode was turned off because system proxy is enabled"
         }
       }
     },

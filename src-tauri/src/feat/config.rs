@@ -260,7 +260,71 @@ async fn process_terminated_flags(update_flags: UpdateFlags, patch: &IVerge) -> 
     Ok(())
 }
 
+/// Which proxy mode was forced off because the other one was turned on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ForcedOff {
+    SystemProxy,
+    TunMode,
+}
+
+impl ForcedOff {
+    /// Notice status consumed by the frontend notification handler.
+    const fn notice_status(self) -> &'static str {
+        match self {
+            Self::SystemProxy => "proxy_mode::system_proxy_auto_disabled",
+            Self::TunMode => "proxy_mode::tun_mode_auto_disabled",
+        }
+    }
+}
+
+/// System proxy and TUN mode are mutually exclusive.
+///
+/// When `patch` turns one of them on while the other one is currently on (or is
+/// turned on by the same patch), the other one is forced off *inside the patch*
+/// so that its side effects (clearing the OS proxy / reloading the core config)
+/// run through the regular update-flag pipeline. When both are turned on by the
+/// same patch, TUN wins.
+///
+/// Returns `None` when nothing needs to change.
+fn resolve_exclusive_modes(patch: &IVerge, sysproxy_on: bool, tun_on: bool) -> Option<(IVerge, ForcedOff)> {
+    let wants_sysproxy = patch.enable_system_proxy == Some(true);
+    let wants_tun = patch.enable_tun_mode == Some(true);
+
+    let forced = if wants_tun && (wants_sysproxy || (patch.enable_system_proxy.is_none() && sysproxy_on)) {
+        ForcedOff::SystemProxy
+    } else if wants_sysproxy && patch.enable_tun_mode.is_none() && tun_on {
+        ForcedOff::TunMode
+    } else {
+        return None;
+    };
+
+    let mut resolved = patch.clone();
+    match forced {
+        ForcedOff::SystemProxy => resolved.enable_system_proxy = Some(false),
+        ForcedOff::TunMode => resolved.enable_tun_mode = Some(false),
+    }
+    Some((resolved, forced))
+}
+
 pub async fn patch_verge(patch: &IVerge, not_save_file: bool) -> Result<()> {
+    let resolved = {
+        let current = Config::verge().await.latest_arc();
+        resolve_exclusive_modes(
+            patch,
+            current.enable_system_proxy.unwrap_or(false),
+            current.enable_tun_mode.unwrap_or(false),
+        )
+    };
+    let forced_off = resolved.as_ref().map(|(_, forced)| *forced);
+    let patch = resolved.as_ref().map_or(patch, |(resolved_patch, _)| resolved_patch);
+    if let Some(forced) = forced_off {
+        logging!(
+            info,
+            Type::ProxyMode,
+            "System proxy and TUN mode are mutually exclusive, forcing off: {forced:?}",
+        );
+    }
+
     Config::verge().await.edit_draft(|d| d.patch_config(patch));
 
     let update_flags = determine_update_flags(patch);
@@ -275,8 +339,16 @@ pub async fn patch_verge(patch: &IVerge, not_save_file: bool) -> Result<()> {
         return Err(err);
     }
     Config::verge().await.apply();
+    if let Some(forced) = forced_off {
+        // Tell the user which switch was turned off for them and make the
+        // frontend re-read the verge config plus the real OS proxy state.
+        handle::Handle::notice_message(forced.notice_status(), "");
+        handle::Handle::refresh_verge();
+    }
     logging_error!(Type::Backup, AutoBackupManager::global().refresh_settings().await);
-    if !not_save_file {
+    // A forced-off switch must always reach disk, even when the caller already
+    // persisted the (pre-resolution) config itself, e.g. backup restore.
+    if !not_save_file || forced_off.is_some() {
         // 分离数据获取和异步调用
         let verge_data = Config::verge().await.data_arc();
         logging!(debug, Type::Setup, "Saving Verge configuration to file...");
@@ -289,4 +361,86 @@ pub async fn fetch_verge_config() -> Result<SharedDraft<IVerge>> {
     let draft = Config::verge().await;
     let data = draft.data_arc();
     Ok(data)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ForcedOff, IVerge, resolve_exclusive_modes};
+
+    fn patch(sysproxy: Option<bool>, tun: Option<bool>) -> IVerge {
+        IVerge {
+            enable_system_proxy: sysproxy,
+            enable_tun_mode: tun,
+            ..IVerge::default()
+        }
+    }
+
+    /// Returns the effective `(enable_system_proxy, enable_tun_mode, forced_off)`.
+    fn resolve(patch: &IVerge, sysproxy_on: bool, tun_on: bool) -> (Option<bool>, Option<bool>, Option<ForcedOff>) {
+        match resolve_exclusive_modes(patch, sysproxy_on, tun_on) {
+            Some((resolved, forced)) => (resolved.enable_system_proxy, resolved.enable_tun_mode, Some(forced)),
+            None => (patch.enable_system_proxy, patch.enable_tun_mode, None),
+        }
+    }
+
+    #[test]
+    fn enabling_tun_forces_system_proxy_off() {
+        assert_eq!(
+            resolve(&patch(None, Some(true)), true, false),
+            (Some(false), Some(true), Some(ForcedOff::SystemProxy)),
+        );
+    }
+
+    #[test]
+    fn enabling_system_proxy_forces_tun_off() {
+        assert_eq!(
+            resolve(&patch(Some(true), None), false, true),
+            (Some(true), Some(false), Some(ForcedOff::TunMode)),
+        );
+    }
+
+    #[test]
+    fn enabling_one_while_other_is_off_is_untouched() {
+        assert_eq!(
+            resolve(&patch(None, Some(true)), false, false),
+            (None, Some(true), None),
+        );
+        assert_eq!(
+            resolve(&patch(Some(true), None), false, false),
+            (Some(true), None, None),
+        );
+    }
+
+    #[test]
+    fn both_enabled_in_same_patch_keeps_tun() {
+        assert_eq!(
+            resolve(&patch(Some(true), Some(true)), false, false),
+            (Some(false), Some(true), Some(ForcedOff::SystemProxy)),
+        );
+    }
+
+    #[test]
+    fn disabling_never_touches_the_other_switch() {
+        assert_eq!(
+            resolve(&patch(None, Some(false)), true, true),
+            (None, Some(false), None),
+        );
+        assert_eq!(
+            resolve(&patch(Some(false), None), true, true),
+            (Some(false), None, None),
+        );
+        assert_eq!(resolve(&patch(None, None), true, true), (None, None, None));
+    }
+
+    #[test]
+    fn explicit_false_for_the_other_switch_is_respected() {
+        assert_eq!(
+            resolve(&patch(Some(false), Some(true)), true, false),
+            (Some(false), Some(true), None),
+        );
+        assert_eq!(
+            resolve(&patch(Some(true), Some(false)), false, true),
+            (Some(true), Some(false), None),
+        );
+    }
 }

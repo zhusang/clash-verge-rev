@@ -35,6 +35,18 @@ export const handleNoticeMessage = (
         msg,
       ),
     'reactivate_profiles::error': () => showNotice.error(msg),
+    'proxy_mode::system_proxy_auto_disabled': () =>
+      showNotice.info(
+        'settings.sections.system.notifications.exclusive.systemProxyAutoDisabled',
+      ),
+    'proxy_mode::tun_mode_auto_disabled': () =>
+      showNotice.info(
+        'settings.sections.system.notifications.exclusive.tunModeAutoDisabled',
+      ),
+    'proxy_mode::tun_unavailable': () =>
+      showNotice.error(
+        'settings.sections.proxyControl.tooltips.tunUnavailable',
+      ),
     update_failed: () => showNotice.error(msg),
     'config_validate::boot_error': () =>
       showNotice.error('shared.feedback.validation.config.bootFailed', msg),

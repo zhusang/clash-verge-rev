@@ -45,7 +45,16 @@ export const useSystemProxyState = () => {
 
   const toggleSystemProxy = async (enabled: boolean) => {
     mutateVerge(
-      (prev) => (prev ? { ...prev, enable_system_proxy: enabled } : prev),
+      (prev) =>
+        prev
+          ? {
+              ...prev,
+              enable_system_proxy: enabled,
+              // System proxy and TUN mode are mutually exclusive. The
+              // backend turns TUN off; mirror it so the switch reacts at once.
+              ...(enabled ? { enable_tun_mode: false } : {}),
+            }
+          : prev,
       false,
     )
     pendingRef.current = enabled

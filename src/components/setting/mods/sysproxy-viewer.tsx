@@ -162,7 +162,14 @@ export const SysproxyViewer = forwardRef<DialogRef>((props, ref) => {
         const currentSysProxy = await getSystemProxy()
         const currentAutoProxy = await getAutotemProxy()
 
-        if (value.pac ? currentAutoProxy?.enable : currentSysProxy?.enable) {
+        const isProxyActive = value.pac
+          ? currentAutoProxy?.enable
+          : currentSysProxy?.enable
+
+        // Only replay the toggle when system proxy is enabled in config.
+        // Otherwise (e.g. TUN mode with an OS proxy set by another app) this
+        // would turn system proxy on and force TUN mode off.
+        if (enabled && isProxyActive) {
           await patchVergeConfig({ enable_system_proxy: false })
           await sleep(200)
           await patchVergeConfig({ enable_system_proxy: true })
@@ -174,7 +181,7 @@ export const SysproxyViewer = forwardRef<DialogRef>((props, ref) => {
     }
 
     updateProxy()
-  }, [clashConfig?.mixedPort, value.pac, invalidateProxyState])
+  }, [clashConfig?.mixedPort, value.pac, enabled, invalidateProxyState])
 
   const { systemProxyAddress } = useAppData()
 
