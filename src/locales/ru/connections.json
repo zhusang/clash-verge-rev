@@ -26,6 +26,39 @@
       "closed": "Закрытые",
       "closeConnection": "Закрыть соединение"
     },
+    "usage": {
+      "title": "Usage",
+      "periods": {
+        "today": "Today",
+        "last24h": "24 Hours",
+        "last7d": "7 Days",
+        "last30d": "30 Days"
+      },
+      "groupBy": {
+        "process": "Process",
+        "host": "Host",
+        "proxy": "Proxy"
+      },
+      "fields": {
+        "total": "Total",
+        "share": "Share"
+      },
+      "unknownProcess": "Unknown process",
+      "tooltips": {
+        "unknownProcess": "mihomo did not report the process. Set find-process-mode to always in the core config, or use TUN mode.",
+        "approximate": "Usage is approximate: bytes sent in the last second before a connection closes are not counted.",
+        "drillDown": "Click a process to see the hosts it accessed"
+      },
+      "actions": {
+        "back": "Back"
+      },
+      "statuses": {
+        "disabled": "Usage history is turned off",
+        "notCollecting": "Usage collector is not running (core stopped or database unavailable)",
+        "openSettings": "Open Settings"
+      },
+      "empty": "No usage recorded in this period"
+    },
     "columnManager": {
       "title": "Столбцы",
       "dragHandle": "Маркер перетаскивания"

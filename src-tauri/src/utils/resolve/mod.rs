@@ -11,6 +11,7 @@ use crate::{
         logger::Logger,
         service::{SERVICE_MANAGER, ServiceManager, is_service_ipc_path_exists},
         sysopt,
+        traffic_usage::TrafficUsageCollector,
         tray::Tray,
     },
     feat,
@@ -57,6 +58,7 @@ pub fn resolve_setup_async() {
 
         let core_init = AsyncHandler::spawn(|| async {
             init_service_manager().await;
+            init_traffic_usage().await;
             init_core_manager().await;
             init_system_proxy().await;
             init_system_proxy_guard().await;
@@ -185,6 +187,10 @@ pub(super) async fn init_service_manager() {
 
 pub(super) async fn init_core_manager() {
     logging_error!(Type::Setup, CoreManager::global().init().await);
+}
+
+pub(super) async fn init_traffic_usage() {
+    logging_error!(Type::Setup, TrafficUsageCollector::global().init().await);
 }
 
 pub(super) async fn init_system_proxy() {

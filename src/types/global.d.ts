@@ -240,6 +240,36 @@ interface IConnections {
   connections: IConnectionsItem[]
 }
 
+/** Aggregation dimension for traffic usage history */
+type TrafficUsageGroupBy = 'process' | 'host' | 'proxy'
+
+interface ITrafficUsageRange {
+  /** inclusive, unix seconds */
+  sinceTs: number
+  /** exclusive, unix seconds */
+  untilTs: number
+}
+
+interface ITrafficUsageFilter {
+  process?: string
+  host?: string
+  proxy?: string
+}
+
+interface ITrafficUsageRow {
+  key: string
+  upload: number
+  download: number
+  total: number
+}
+
+interface ITrafficUsageStatus {
+  enabled: boolean
+  collecting: boolean
+  dbSizeBytes: number
+  oldestBucketTs: number | null
+}
+
 interface IConnectionSetting {
   layout: 'table' | 'list'
 }
@@ -979,6 +1009,8 @@ interface IVergeConfig {
   enable_hover_jump_navigator?: boolean
   hover_jump_navigator_delay?: number
   enable_external_controller?: boolean
+  enable_traffic_usage?: boolean
+  traffic_usage_retention_days?: number
 }
 
 interface IWebDavFile {

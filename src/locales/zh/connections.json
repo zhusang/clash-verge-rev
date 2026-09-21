@@ -26,6 +26,39 @@
       "closed": "已关闭",
       "closeConnection": "关闭连接"
     },
+    "usage": {
+      "title": "流量统计",
+      "periods": {
+        "today": "今天",
+        "last24h": "24 小时",
+        "last7d": "7 天",
+        "last30d": "30 天"
+      },
+      "groupBy": {
+        "process": "进程",
+        "host": "主机",
+        "proxy": "节点"
+      },
+      "fields": {
+        "total": "合计",
+        "share": "占比"
+      },
+      "unknownProcess": "未知进程",
+      "tooltips": {
+        "unknownProcess": "内核未报告进程名。请在内核配置中把 find-process-mode 设为 always，或使用虚拟网卡模式。",
+        "approximate": "统计值为近似值：连接关闭前最后一秒内传输的字节不会计入。",
+        "drillDown": "点击进程可查看它访问过的主机"
+      },
+      "actions": {
+        "back": "返回"
+      },
+      "statuses": {
+        "disabled": "流量统计已关闭",
+        "notCollecting": "采集未运行（内核已停止或数据库不可用）",
+        "openSettings": "打开设置"
+      },
+      "empty": "该时间段内没有记录"
+    },
     "columnManager": {
       "title": "列设置",
       "dragHandle": "拖拽控件"

@@ -30,8 +30,13 @@ import {
 } from '@/components/connection/connection-detail'
 import { ConnectionItem } from '@/components/connection/connection-item'
 import { ConnectionTable } from '@/components/connection/connection-table'
+import { TrafficUsageView } from '@/components/connection/traffic-usage-view'
 import { useConnectionData } from '@/hooks/use-connection-data'
 import { useConnectionSetting } from '@/hooks/use-connection-setting'
+import {
+  initialTrafficUsageViewState,
+  type TrafficUsageViewState,
+} from '@/hooks/use-traffic-usage'
 import parseTraffic from '@/utils/parse-traffic'
 
 type OrderFunc = (list: IConnectionsItem[]) => IConnectionsItem[]
@@ -63,6 +68,8 @@ const ORDER_OPTIONS = [
 
 type OrderKey = (typeof ORDER_OPTIONS)[number]['id']
 
+type ConnectionsView = 'active' | 'closed' | 'usage'
+
 const orderFunctionMap = ORDER_OPTIONS.reduce<Record<OrderKey, OrderFunc>>(
   (acc, option) => {
     acc[option.id] = option.fn
@@ -77,9 +84,13 @@ const ConnectionsPage = () => {
     () => () => true,
   )
   const [curOrderOpt, setCurOrderOpt] = useState<OrderKey>('default')
-  const [connectionsType, setConnectionsType] = useState<'active' | 'closed'>(
-    'active',
+  const [connectionsType, setConnectionsType] =
+    useState<ConnectionsView>('active')
+  // Kept on the page so period / dimension survive switching tabs.
+  const [usageViewState, setUsageViewState] = useState<TrafficUsageViewState>(
+    initialTrafficUsageViewState,
   )
+  const isUsageView = connectionsType === 'usage'
 
   const {
     response: { data: connections },
@@ -93,6 +104,7 @@ const ConnectionsPage = () => {
   const [isColumnManagerOpen, setIsColumnManagerOpen] = useState(false)
 
   const [filterConn] = useMemo(() => {
+    if (connectionsType === 'usage') return [[] as IConnectionsItem[]]
     const orderFunc = orderFunctionMap[curOrderOpt]
     const conns =
       (connectionsType === 'active'
@@ -203,8 +215,15 @@ const ConnectionsPage = () => {
             {t('connections.components.actions.closed')}{' '}
             {connections?.closedConnections.length}
           </Button>
+          <Button
+            size="small"
+            variant={isUsageView ? 'contained' : 'outlined'}
+            onClick={() => setConnectionsType('usage')}
+          >
+            {t('connections.components.usage.title')}
+          </Button>
         </ButtonGroup>
-        {!isTableLayout && (
+        {!isTableLayout && !isUsageView && (
           <BaseStyledSelect
             value={curOrderOpt}
             onChange={(e) => setCurOrderOpt(e.target.value as OrderKey)}
@@ -216,21 +235,29 @@ const ConnectionsPage = () => {
             ))}
           </BaseStyledSelect>
         )}
-        <Box
-          sx={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            '& > *': {
+        {!isUsageView && (
+          <Box
+            sx={{
               flex: 1,
-            },
-          }}
-        >
-          <BaseSearchBox onSearch={handleSearch} />
-        </Box>
+              display: 'flex',
+              alignItems: 'center',
+              '& > *': {
+                flex: 1,
+              },
+            }}
+          >
+            <BaseSearchBox onSearch={handleSearch} />
+          </Box>
+        )}
       </Box>
 
-      {!hasTableData ? (
+      {isUsageView ? (
+        <TrafficUsageView
+          active={isUsageView}
+          state={usageViewState}
+          onStateChange={setUsageViewState}
+        />
+      ) : !hasTableData ? (
         <BaseEmpty />
       ) : isTableLayout ? (
         <ConnectionTable

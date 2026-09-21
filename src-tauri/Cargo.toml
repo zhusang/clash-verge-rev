@@ -106,6 +106,9 @@ tokio-rustls = "0.26"
 rustls = { version = "0.23", features = ["ring"] }
 webpki-roots = "1.0"
 rust_iso3166 = "0.1.14"
+# Traffic usage history is persisted to SQLite; `bundled` compiles SQLite in so
+# no system library is required on any platform.
+rusqlite = { version = "0.36", features = ["bundled"] }
 # Use the git repo until the next release after v2.0.0.
 dark-light = { git = "https://github.com/rust-dark-light/dark-light" }
 

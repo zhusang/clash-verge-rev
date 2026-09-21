@@ -257,6 +257,12 @@ pub struct IVerge {
 
     /// 启用外部控制器
     pub enable_external_controller: Option<bool>,
+
+    /// Record per-process / host / proxy traffic usage in the background
+    pub enable_traffic_usage: Option<bool>,
+
+    /// Days to keep traffic usage history (1-365)
+    pub traffic_usage_retention_days: Option<u32>,
 }
 
 #[derive(Default, Debug, Clone, Deserialize, Serialize)]
@@ -448,6 +454,8 @@ impl IVerge {
             enable_dns_settings: Some(false),
             home_cards: None,
             enable_external_controller: Some(false),
+            enable_traffic_usage: Some(true),
+            traffic_usage_retention_days: Some(30),
             ..Self::default()
         }
     }
@@ -552,6 +560,8 @@ impl IVerge {
         patch!(enable_dns_settings);
         patch!(home_cards);
         patch!(enable_external_controller);
+        patch!(enable_traffic_usage);
+        patch!(traffic_usage_retention_days);
     }
 
     pub const fn get_singleton_port() -> u16 {

@@ -273,6 +273,32 @@
     }
   },
   "modals": {
+    "trafficUsage": {
+      "title": "Traffic Usage History",
+      "toggle": "Traffic Usage History",
+      "tooltips": {
+        "toggle": "Record which process, host and proxy consumed traffic. View it on the Connections page under \"Usage\"."
+      },
+      "fields": {
+        "retentionDays": "Keep history for",
+        "dbSize": "Database size"
+      },
+      "units": {
+        "days": "days"
+      },
+      "actions": {
+        "clear": "Clear History"
+      },
+      "messages": {
+        "clearConfirm": "Delete all recorded traffic usage? This cannot be undone."
+      },
+      "validation": {
+        "retentionRange": "Retention must be between 1 and 365 days"
+      },
+      "notifications": {
+        "cleared": "Traffic usage history cleared"
+      }
+    },
     "clashPort": {
       "title": "Port Config",
       "fields": {

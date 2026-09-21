@@ -273,6 +273,32 @@
     }
   },
   "modals": {
+    "trafficUsage": {
+      "title": "流量統計",
+      "toggle": "流量統計",
+      "tooltips": {
+        "toggle": "記錄各處理程序、主機與節點消耗的流量，可在連線頁的「流量統計」中查看。"
+      },
+      "fields": {
+        "retentionDays": "歷史保留",
+        "dbSize": "資料庫大小"
+      },
+      "units": {
+        "days": "天"
+      },
+      "actions": {
+        "clear": "清空歷史"
+      },
+      "messages": {
+        "clearConfirm": "確定刪除全部流量統計記錄？此操作無法復原。"
+      },
+      "validation": {
+        "retentionRange": "保留天數必須在 1 到 365 之間"
+      },
+      "notifications": {
+        "cleared": "流量統計記錄已清空"
+      }
+    },
     "clashPort": {
       "title": "連接埠設定",
       "fields": {

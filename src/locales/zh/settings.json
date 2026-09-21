@@ -273,6 +273,32 @@
     }
   },
   "modals": {
+    "trafficUsage": {
+      "title": "流量统计",
+      "toggle": "流量统计",
+      "tooltips": {
+        "toggle": "记录各进程、主机与节点消耗的流量，可在连接页的\"流量统计\"中查看。"
+      },
+      "fields": {
+        "retentionDays": "历史保留",
+        "dbSize": "数据库大小"
+      },
+      "units": {
+        "days": "天"
+      },
+      "actions": {
+        "clear": "清空历史"
+      },
+      "messages": {
+        "clearConfirm": "确定删除全部流量统计记录？此操作无法撤销。"
+      },
+      "validation": {
+        "retentionRange": "保留天数必须在 1 到 365 之间"
+      },
+      "notifications": {
+        "cleared": "流量统计记录已清空"
+      }
+    },
     "clashPort": {
       "title": "端口设置",
       "fields": {

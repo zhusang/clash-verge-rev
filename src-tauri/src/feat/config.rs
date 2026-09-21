@@ -1,6 +1,8 @@
 use crate::{
     config::{Config, IVerge},
-    core::{CoreManager, autostart, handle, hotkey, logger::Logger, sysopt, tray},
+    core::{
+        CoreManager, autostart, handle, hotkey, logger::Logger, sysopt, traffic_usage::TrafficUsageCollector, tray,
+    },
     module::{auto_backup::AutoBackupManager, lightweight},
 };
 use anyhow::Result;
@@ -61,6 +63,7 @@ bitflags! {
         const LANGUAGE = 1 << 11;
         const LOG_LEVEL = 1 << 12;
         const LOG_FILE = 1 << 13;
+        const TRAFFIC_USAGE = 1 << 14;
 
         const GROUP_SYS_TRAY = Self::SYSTRAY_MENU.bits()
                              | Self::SYSTRAY_TOOLTIP.bits()
@@ -110,6 +113,7 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
     let log_level = &patch.app_log_level;
     let log_max_size = patch.app_log_max_size;
     let log_max_count = patch.app_log_max_count;
+    let traffic_usage_changed = patch.enable_traffic_usage.is_some() || patch.traffic_usage_retention_days.is_some();
 
     #[cfg(target_os = "windows")]
     let restart_core_needed = socks_enabled.is_some()
@@ -190,6 +194,7 @@ fn determine_update_flags(patch: &IVerge) -> UpdateFlags {
     if tray_inline_outbound_modes.is_some() {
         update_flags.insert(UpdateFlags::SYSTRAY_MENU);
     }
+    update_flags.set(UpdateFlags::TRAFFIC_USAGE, traffic_usage_changed);
 
     update_flags
 }
@@ -256,6 +261,9 @@ async fn process_terminated_flags(update_flags: UpdateFlags, patch: &IVerge) -> 
         let log_max_size = patch.app_log_max_size.unwrap_or(128);
         let log_max_count = patch.app_log_max_count.unwrap_or(8);
         Logger::global().update_log_config(log_max_size, log_max_count).await?;
+    }
+    if update_flags.contains(UpdateFlags::TRAFFIC_USAGE) {
+        TrafficUsageCollector::global().refresh_settings().await;
     }
     Ok(())
 }

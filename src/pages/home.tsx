@@ -312,8 +312,8 @@ const HomePage = () => {
       traffic: false,
       clashinfo: true,
       systeminfo: true,
-      test: true,
-      ip: true,
+      test: false,
+      ip: false,
     }),
     [],
   )

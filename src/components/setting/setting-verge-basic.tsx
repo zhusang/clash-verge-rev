@@ -1,10 +1,10 @@
-import { ContentCopyRounded } from '@mui/icons-material'
+import { ContentCopyRounded, TuneRounded } from '@mui/icons-material'
 import { Button, Input, MenuItem, Select } from '@mui/material'
 import { open } from '@tauri-apps/plugin-dialog'
 import { useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { DialogRef, TooltipIcon } from '@/components/base'
+import { DialogRef, Switch, TooltipIcon } from '@/components/base'
 import { useVerge } from '@/hooks/use-verge'
 import { navItems } from '@/pages/_routers'
 import { copyClashEnv } from '@/services/cmds'
@@ -21,6 +21,7 @@ import { MiscViewer } from './mods/misc-viewer'
 import { SettingItem, SettingList } from './mods/setting-comp'
 import { ThemeModeSwitch } from './mods/theme-mode-switch'
 import { ThemeViewer } from './mods/theme-viewer'
+import { TrafficUsageViewer } from './mods/traffic-usage-viewer'
 import { UpdateViewer } from './mods/update-viewer'
 
 interface Props {
@@ -60,6 +61,7 @@ const SettingVergeBasic = ({ onError }: Props) => {
     env_type,
     startup_script,
     start_page,
+    enable_traffic_usage,
   } = verge ?? {}
   const configRef = useRef<DialogRef>(null)
   const hotkeyRef = useRef<DialogRef>(null)
@@ -68,6 +70,7 @@ const SettingVergeBasic = ({ onError }: Props) => {
   const layoutRef = useRef<DialogRef>(null)
   const updateRef = useRef<DialogRef>(null)
   const backupRef = useRef<DialogRef>(null)
+  const trafficUsageRef = useRef<DialogRef>(null)
 
   const onChangeData = (patch: any) => {
     mutateVerge({ ...verge, ...patch }, false)
@@ -87,6 +90,7 @@ const SettingVergeBasic = ({ onError }: Props) => {
       <LayoutViewer ref={layoutRef} />
       <UpdateViewer ref={updateRef} />
       <BackupViewer ref={backupRef} />
+      <TrafficUsageViewer ref={trafficUsageRef} />
 
       <SettingItem label={t('settings.components.verge.basic.fields.language')}>
         <GuardState
@@ -248,6 +252,34 @@ const SettingVergeBasic = ({ onError }: Props) => {
               </>
             }
           ></Input>
+        </GuardState>
+      </SettingItem>
+
+      <SettingItem
+        label={t('settings.modals.trafficUsage.toggle')}
+        extra={
+          <>
+            <TooltipIcon
+              title={t('settings.modals.trafficUsage.tooltips.toggle')}
+              sx={{ opacity: '0.7' }}
+            />
+            <TooltipIcon
+              title={t('settings.modals.trafficUsage.title')}
+              icon={TuneRounded}
+              onClick={() => trafficUsageRef.current?.open()}
+            />
+          </>
+        }
+      >
+        <GuardState
+          value={enable_traffic_usage ?? true}
+          valueProps="checked"
+          onCatch={onError}
+          onFormat={(_e: any, value: boolean) => value}
+          onChange={(e) => onChangeData({ enable_traffic_usage: e })}
+          onGuard={(e) => patchVerge({ enable_traffic_usage: e })}
+        >
+          <Switch edge="end" />
         </GuardState>
       </SettingItem>
 

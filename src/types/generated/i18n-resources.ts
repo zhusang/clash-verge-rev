@@ -32,6 +32,39 @@ export interface TranslationResources {
           downloadSpeed: string
           uploadSpeed: string
         }
+        usage: {
+          actions: {
+            back: string
+          }
+          empty: string
+          fields: {
+            share: string
+            total: string
+          }
+          groupBy: {
+            host: string
+            process: string
+            proxy: string
+          }
+          periods: {
+            last24h: string
+            last30d: string
+            last7d: string
+            today: string
+          }
+          statuses: {
+            disabled: string
+            notCollecting: string
+            openSettings: string
+          }
+          title: string
+          tooltips: {
+            approximate: string
+            drillDown: string
+            unknownProcess: string
+          }
+          unknownProcess: string
+        }
       }
       page: {
         title: string
@@ -1016,6 +1049,32 @@ export interface TranslationResources {
           title: string
           tooltips: {
             proxyGuard: string
+          }
+        }
+        trafficUsage: {
+          actions: {
+            clear: string
+          }
+          fields: {
+            dbSize: string
+            retentionDays: string
+          }
+          messages: {
+            clearConfirm: string
+          }
+          notifications: {
+            cleared: string
+          }
+          title: string
+          toggle: string
+          tooltips: {
+            toggle: string
+          }
+          units: {
+            days: string
+          }
+          validation: {
+            retentionRange: string
           }
         }
         tun: {

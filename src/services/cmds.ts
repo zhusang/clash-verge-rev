@@ -255,6 +255,26 @@ export async function patchVergeConfig(payload: IVergeConfig) {
   return invoke<void>('patch_verge_config', { payload })
 }
 
+export async function getTrafficUsage(
+  range: ITrafficUsageRange,
+  groupBy: TrafficUsageGroupBy,
+  filter?: ITrafficUsageFilter,
+) {
+  return invoke<ITrafficUsageRow[]>('get_traffic_usage', {
+    range,
+    groupBy,
+    filter,
+  })
+}
+
+export async function clearTrafficUsage() {
+  return invoke<void>('clear_traffic_usage')
+}
+
+export async function getTrafficUsageStatus() {
+  return invoke<ITrafficUsageStatus>('get_traffic_usage_status')
+}
+
 export async function getSystemProxy() {
   return invoke<{
     enable: boolean

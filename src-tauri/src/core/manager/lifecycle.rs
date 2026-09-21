@@ -4,6 +4,7 @@ use crate::config::{Config, IVerge};
 use crate::core::handle::Handle;
 use crate::core::manager::CLASH_LOGGER;
 use crate::core::service::{SERVICE_MANAGER, ServiceStatus};
+use crate::core::traffic_usage::TrafficUsageCollector;
 use anyhow::Result;
 use clash_verge_logging::{Type, logging};
 use scopeguard::defer;
@@ -25,6 +26,10 @@ impl CoreManager {
 
     pub async fn stop_core(&self) -> Result<()> {
         CLASH_LOGGER.clear_logs().await;
+        // The connections stream dies with the core; persist what we have first.
+        let collector = TrafficUsageCollector::global();
+        collector.stop_subscription();
+        collector.flush_now().await;
         defer! {
             self.after_core_process();
         }
@@ -78,7 +83,9 @@ impl CoreManager {
 
     fn after_core_process(&self) {
         let app_handle = Handle::app_handle();
-        tauri_plugin_clash_verge_sysinfo::set_app_core_mode(app_handle, self.get_running_mode().to_string());
+        let mode = self.get_running_mode();
+        tauri_plugin_clash_verge_sysinfo::set_app_core_mode(app_handle, mode.to_string());
+        TrafficUsageCollector::global().notify_core_state(!matches!(*mode, RunningMode::NotRunning));
     }
 
     #[cfg(target_os = "windows")]
