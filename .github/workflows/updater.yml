@@ -7,6 +7,8 @@ env:
 
 jobs:
   release-update:
+    # 当前仅发布安装包，不生成自动更新清单。
+    if: ${{ false }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -31,6 +33,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   release-update-for-fixed-webview2:
+    # 当前仅发布安装包，不生成自动更新清单。
+    if: ${{ false }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository

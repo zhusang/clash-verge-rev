@@ -22,7 +22,6 @@ import { SettingItem, SettingList } from './mods/setting-comp'
 import { ThemeModeSwitch } from './mods/theme-mode-switch'
 import { ThemeViewer } from './mods/theme-viewer'
 import { TrafficUsageViewer } from './mods/traffic-usage-viewer'
-import { UpdateViewer } from './mods/update-viewer'
 
 interface Props {
   onError?: (err: Error) => void
@@ -68,7 +67,6 @@ const SettingVergeBasic = ({ onError }: Props) => {
   const miscRef = useRef<DialogRef>(null)
   const themeRef = useRef<DialogRef>(null)
   const layoutRef = useRef<DialogRef>(null)
-  const updateRef = useRef<DialogRef>(null)
   const backupRef = useRef<DialogRef>(null)
   const trafficUsageRef = useRef<DialogRef>(null)
 
@@ -88,7 +86,6 @@ const SettingVergeBasic = ({ onError }: Props) => {
       <HotkeyViewer ref={hotkeyRef} />
       <MiscViewer ref={miscRef} />
       <LayoutViewer ref={layoutRef} />
-      <UpdateViewer ref={updateRef} />
       <BackupViewer ref={backupRef} />
       <TrafficUsageViewer ref={trafficUsageRef} />
 
