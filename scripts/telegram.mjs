@@ -19,12 +19,20 @@ async function sendTelegramNotification() {
       return JSON.parse(pkg).version
     })()
 
-  const downloadUrl =
-    process.env.DOWNLOAD_URL ||
-    `https://github.com/clash-verge-rev/clash-verge-rev/releases/download/v${version}`
-
   const isAutobuild =
     process.env.BUILD_TYPE === 'autobuild' || version.includes('autobuild')
+  const releaseTag = isAutobuild ? 'autobuild' : `v${version}`
+  const repository = process.env.GITHUB_REPOSITORY
+  const serverUrl = process.env.GITHUB_SERVER_URL || 'https://github.com'
+  const downloadUrl =
+    process.env.DOWNLOAD_URL ||
+    (repository
+      ? `${serverUrl}/${repository}/releases/tag/${encodeURIComponent(releaseTag)}`
+      : undefined)
+  if (!downloadUrl) {
+    throw new Error('需要提供 DOWNLOAD_URL 或 GITHUB_REPOSITORY')
+  }
+
   const chatId = isAutobuild ? CHAT_ID_TEST : CHAT_ID_RELEASE
   const buildType = isAutobuild ? '滚动更新版' : '正式版'
 
@@ -33,7 +41,7 @@ async function sendTelegramNotification() {
   log_info(`Download URL: ${downloadUrl}`)
 
   // 读取发布说明和下载地址
-  let releaseContent = ''
+  let releaseContent
   try {
     releaseContent = readFileSync('release.txt', 'utf-8')
     log_info('成功读取 release.txt 文件')
@@ -110,9 +118,7 @@ async function sendTelegramNotification() {
   )
 
   const releaseTitle = isAutobuild ? '滚动更新版发布' : '正式发布'
-  const encodedVersion = encodeURIComponent(version)
-  const releaseTag = isAutobuild ? 'autobuild' : `v${version}`
-  const content = `<b>🎉 <a href="https://github.com/clash-verge-rev/clash-verge-rev/releases/tag/${releaseTag}">Clash Verge Rev v${version}</a> ${releaseTitle}</b>\n\n${formattedContent}`
+  const content = `<b>🎉 <a href="${downloadUrl}">DinoVPN v${version}</a> ${releaseTitle}</b>\n\n${formattedContent}`
 
   // 发送到 Telegram
   try {
@@ -123,7 +129,7 @@ async function sendTelegramNotification() {
         text: content,
         link_preview_options: {
           is_disabled: false,
-          url: `https://github.com/clash-verge-rev/clash-verge-rev/releases/tag/v${encodedVersion}`,
+          url: downloadUrl,
           prefer_large_media: true,
         },
         parse_mode: 'HTML',
