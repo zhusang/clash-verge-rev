@@ -13,6 +13,11 @@ use tauri_plugin_clash_verge_sysinfo;
 
 impl CoreManager {
     pub async fn start_core(&self) -> Result<()> {
+        let _guard = self.lifecycle_lock.lock().await;
+        self.start_core_inner().await
+    }
+
+    pub(super) async fn start_core_inner(&self) -> Result<()> {
         self.prepare_startup().await?;
         defer! {
             self.after_core_process();
@@ -25,6 +30,11 @@ impl CoreManager {
     }
 
     pub async fn stop_core(&self) -> Result<()> {
+        let _guard = self.lifecycle_lock.lock().await;
+        self.stop_core_inner().await
+    }
+
+    pub(super) async fn stop_core_inner(&self) -> Result<()> {
         CLASH_LOGGER.clear_logs().await;
         // The connections stream dies with the core; persist what we have first.
         let collector = TrafficUsageCollector::global();
@@ -45,12 +55,16 @@ impl CoreManager {
     }
 
     pub async fn restart_core(&self) -> Result<()> {
+        let _guard = self.lifecycle_lock.lock().await;
         logging!(info, Type::Core, "Restarting core");
-        self.stop_core().await?;
-        self.start_core().await
+        self.stop_core_inner().await?;
+        super::upgrade::wait_for_shutdown().await?;
+        self.start_core_inner().await?;
+        super::upgrade::wait_for_ready(None).await
     }
 
     pub async fn change_core(&self, clash_core: &String) -> Result<(), String> {
+        let guard = self.lifecycle_lock.lock().await;
         if !IVerge::VALID_CLASH_CORES.contains(&clash_core.as_str()) {
             return Err(format!("Invalid clash core: {}", clash_core).into());
         }
@@ -62,6 +76,7 @@ impl CoreManager {
 
         let verge_data = Config::verge().await.latest_arc();
         verge_data.save_file().await.map_err(|e| e.to_string())?;
+        drop(guard);
 
         self.update_config().await.stringify_err()?;
         Ok(())

@@ -1,6 +1,7 @@
 mod config;
 mod lifecycle;
 mod state;
+mod upgrade;
 
 use anyhow::Result;
 use arc_swap::{ArcSwap, ArcSwapOption};
@@ -34,6 +35,7 @@ impl fmt::Display for RunningMode {
 pub struct CoreManager {
     state: ArcSwap<State>,
     last_update: ArcSwapOption<Instant>,
+    lifecycle_lock: tokio::sync::Mutex<()>,
 }
 
 #[derive(Debug)]
@@ -56,6 +58,7 @@ impl Default for CoreManager {
         Self {
             state: ArcSwap::new(Arc::new(State::default())),
             last_update: ArcSwapOption::new(None),
+            lifecycle_lock: tokio::sync::Mutex::new(()),
         }
     }
 }

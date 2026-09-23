@@ -9,6 +9,11 @@ members = [
   "crates/clash-verge-limiter",
 ]
 resolver = "2"
+exclude = ["vendor/tauri-plugin-mihomo"]
+
+# 固定上游快照并携带新版 Mihomo 响应兼容补丁，保证本地与 CI 行为一致。
+[patch."https://github.com/clash-verge-rev/tauri-plugin-mihomo"]
+tauri-plugin-mihomo = { path = "vendor/tauri-plugin-mihomo" }
 
 [profile.release]
 panic = "abort"

@@ -1,5 +1,5 @@
 import { DeveloperBoardOutlined } from '@mui/icons-material'
-import { Divider, Stack, Typography } from '@mui/material'
+import { Alert, Button, Divider, Stack, Typography } from '@mui/material'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -19,15 +19,20 @@ const formatUptime = (uptimeMs: number) => {
 export const ClashInfoCard = () => {
   const { t } = useTranslation()
   const { version: clashVersion } = useClash()
-  const { clashConfig, rules, uptime, systemProxyAddress } = useAppData()
+  const {
+    clashConfig,
+    rules,
+    uptime,
+    systemProxyAddress,
+    isCoreDataPending,
+    refreshAll,
+  } = useAppData()
 
   // 使用useMemo缓存格式化后的uptime，避免频繁计算
   const formattedUptime = useMemo(() => formatUptime(uptime), [uptime])
 
   // 使用备忘录组件内容，减少重新渲染
   const cardContent = useMemo(() => {
-    if (!clashConfig) return null
-
     return (
       <Stack spacing={1.5}>
         <Stack direction="row" justifyContent="space-between">
@@ -53,7 +58,7 @@ export const ClashInfoCard = () => {
             {t('home.components.clashInfo.fields.mixedPort')}
           </Typography>
           <Typography variant="body2" fontWeight="medium">
-            {clashConfig.mixedPort || '-'}
+            {clashConfig?.mixedPort || '-'}
           </Typography>
         </Stack>
         <Divider />
@@ -92,6 +97,19 @@ export const ClashInfoCard = () => {
       iconColor="warning"
       action={null}
     >
+      {!clashConfig && !isCoreDataPending && (
+        <Alert
+          severity="warning"
+          sx={{ mb: 1.5 }}
+          action={
+            <Button color="inherit" size="small" onClick={() => refreshAll()}>
+              {t('shared.actions.retry')}
+            </Button>
+          }
+        >
+          {t('home.components.clashMode.errors.communication')}
+        </Alert>
+      )}
       {cardContent}
     </EnhancedCard>
   )

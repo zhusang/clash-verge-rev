@@ -1,6 +1,6 @@
 [package]
 name = "clash-verge"
-version = "3.2.1"
+version = "3.2.2"
 description = "clash verge"
 authors = ["zzzgydi", "Tunglies", "wonfen", "MystiPanda"]
 license = "GPL-3.0-only"
@@ -82,6 +82,8 @@ tauri-plugin-process = "2.3.1"
 tauri-plugin-deep-link = "2.4.7"
 tauri-plugin-window-state = "2.4.1"
 zip = "8.3.1"
+flate2 = "1.1.9"
+sha2 = "0.10.9"
 reqwest_dav = "0.3.3"
 aes-gcm = { version = "0.10.3", features = ["std"] }
 base64 = "0.22.1"
@@ -125,6 +127,7 @@ tauri-plugin-updater = "2.10.0"
 
 [dev-dependencies]
 criterion = { workspace = true }
+tempfile = "3.27.0"
 
 [lints]
 workspace = true

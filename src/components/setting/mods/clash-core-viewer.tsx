@@ -15,12 +15,13 @@ import { useLockFn } from 'ahooks'
 import type { Ref } from 'react'
 import { useImperativeHandle, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { closeAllConnections, upgradeCore } from 'tauri-plugin-mihomo-api'
+import { closeAllConnections } from 'tauri-plugin-mihomo-api'
 
 import { BaseDialog, DialogRef } from '@/components/base'
-import { useClash, useClashInfo } from '@/hooks/use-clash'
+import { useClash } from '@/hooks/use-clash'
 import { useVerge } from '@/hooks/use-verge'
-import { changeClashCore, restartCore } from '@/services/cmds'
+import { useAppData } from '@/providers/app-data-context'
+import { changeClashCore, restartCore, upgradeClashCore } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
 
 const VALID_CORE = [
@@ -41,7 +42,11 @@ export function ClashCoreViewer({ ref }: { ref?: Ref<DialogRef> }) {
 
   const { verge, mutateVerge } = useVerge()
   const { mutateVersion } = useClash()
-  const { invalidateClashConfig } = useClashInfo()
+  const { refreshAll } = useAppData()
+
+  const refreshCoreData = async () => {
+    await Promise.all([refreshAll(), mutateVersion(), mutateVerge()])
+  }
 
   const [open, setOpen] = useState(false)
   const [upgrading, setUpgrading] = useState(false)
@@ -60,7 +65,7 @@ export function ClashCoreViewer({ ref }: { ref?: Ref<DialogRef> }) {
 
     try {
       setChangingCore(core)
-      closeAllConnections()
+      await closeAllConnections().catch(() => {})
       const errorMsg = await changeClashCore(core)
 
       if (errorMsg) {
@@ -69,12 +74,8 @@ export function ClashCoreViewer({ ref }: { ref?: Ref<DialogRef> }) {
         return
       }
 
-      mutateVerge()
-      setTimeout(async () => {
-        invalidateClashConfig()
-        mutateVersion()
-        setChangingCore(null)
-      }, 500)
+      await refreshCoreData()
+      setChangingCore(null)
     } catch (err) {
       setChangingCore(null)
       showNotice.error(err)
@@ -85,6 +86,7 @@ export function ClashCoreViewer({ ref }: { ref?: Ref<DialogRef> }) {
     try {
       setRestarting(true)
       await restartCore()
+      await refreshCoreData()
       showNotice.success(
         t('settings.feedback.notifications.clash.restartSuccess'),
       )
@@ -98,18 +100,22 @@ export function ClashCoreViewer({ ref }: { ref?: Ref<DialogRef> }) {
   const onUpgrade = useLockFn(async () => {
     try {
       setUpgrading(true)
-      await upgradeCore()
-      setUpgrading(false)
+      await upgradeClashCore()
+      await refreshCoreData()
       showNotice.success(
         t('settings.feedback.notifications.clash.versionUpdated'),
       )
     } catch (err: any) {
-      setUpgrading(false)
       const errMsg = err?.response?.data?.message ?? String(err)
-      const showMsg = errMsg.includes('already using latest version')
-        ? t('settings.feedback.notifications.clash.alreadyLatestVersion')
-        : errMsg
-      showNotice.info(showMsg)
+      if (errMsg.includes('already using latest version')) {
+        showNotice.info(
+          t('settings.feedback.notifications.clash.alreadyLatestVersion'),
+        )
+      } else {
+        showNotice.error(errMsg)
+      }
+    } finally {
+      setUpgrading(false)
     }
   })
 
@@ -138,7 +144,7 @@ export function ClashCoreViewer({ ref }: { ref?: Ref<DialogRef> }) {
               startIcon={<RestartAltRounded />}
               loadingPosition="start"
               loading={restarting}
-              disabled={upgrading}
+              disabled={upgrading || changingCore !== null}
               onClick={onRestart}
             >
               {t('shared.actions.restart')}

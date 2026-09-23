@@ -73,6 +73,10 @@ export async function getClashInfo() {
   return invoke<IClashInfo | null>('get_clash_info')
 }
 
+export async function upgradeClashCore() {
+  return invoke<void>('upgrade_clash_core')
+}
+
 // Get runtime config which controlled by verge
 export async function getRuntimeConfig() {
   return invoke<IConfigData | null>('get_runtime_config')

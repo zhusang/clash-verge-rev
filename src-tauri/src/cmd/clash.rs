@@ -105,6 +105,15 @@ pub async fn restart_core() -> CmdResult {
     result
 }
 
+/// 通过应用生命周期管理器升级内核，避免内核自行重启后脱离服务管理。
+#[tauri::command]
+pub async fn upgrade_clash_core() -> CmdResult {
+    CoreManager::global().upgrade_core().await.map_err(|err| {
+        logging!(error, Type::Core, "内核升级失败: {err:#}");
+        format!("{err:#}").into()
+    })
+}
+
 /// 测试URL延迟
 #[tauri::command]
 pub async fn test_delay(url: String) -> CmdResult<u32> {

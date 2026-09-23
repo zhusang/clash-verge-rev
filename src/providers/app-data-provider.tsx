@@ -19,8 +19,8 @@ import {
 import { AppDataContext, AppDataContextType } from './app-data-context'
 
 const TQ_MIHOMO = {
-  refetchOnWindowFocus: false,
-  refetchOnReconnect: false,
+  refetchOnWindowFocus: true,
+  refetchOnReconnect: true,
   staleTime: 1500,
   retry: 3,
   retryDelay: (attempt: number) => Math.min(200 * 2 ** attempt, 3000),

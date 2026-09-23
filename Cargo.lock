@@ -1108,7 +1108,7 @@ checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
 
 [[package]]
 name = "clash-verge"
-version = "3.2.1"
+version = "3.2.2"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -1133,6 +1133,7 @@ dependencies = [
  "deelevate",
  "delay_timer",
  "dunce",
+ "flate2",
  "flexi_logger",
  "futures",
  "gethostname",
@@ -1155,6 +1156,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml_ng",
+ "sha2 0.10.9",
  "smartstring",
  "sysproxy",
  "tauri",
@@ -1174,6 +1176,7 @@ dependencies = [
  "tauri-plugin-shell",
  "tauri-plugin-updater",
  "tauri-plugin-window-state",
+ "tempfile",
  "tokio",
  "tokio-rustls",
  "tokio-stream",
@@ -7740,7 +7743,6 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-mihomo"
 version = "0.1.5"
-source = "git+https://github.com/clash-verge-rev/tauri-plugin-mihomo?branch=revert#1cc80bc0fbe1245315617f4cecd93710a152325b"
 dependencies = [
  "base64 0.22.1",
  "bytes",
