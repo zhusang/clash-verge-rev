@@ -175,10 +175,9 @@ const META_ALPHA_VERSION_URL =
 const META_ALPHA_URL_PREFIX = `https://github.com/MetaCubeX/mihomo/releases/download/Prerelease-Alpha`
 let META_ALPHA_VERSION
 
-const META_VERSION_URL =
-  'https://github.com/MetaCubeX/mihomo/releases/latest/download/version.txt'
+// 稳定版固定版本；--force 只重新下载，不跟随上游最新版本。
+const META_VERSION = 'v1.19.23'
 const META_URL_PREFIX = `https://github.com/MetaCubeX/mihomo/releases/download`
-let META_VERSION
 
 const META_ALPHA_MAP = {
   'win32-x64': 'mihomo-windows-amd64-v2',
@@ -241,38 +240,6 @@ async function getLatestAlphaVersion() {
     await setCachedVersion('META_ALPHA_VERSION', META_ALPHA_VERSION)
   } catch (err) {
     log_error('Error fetching latest alpha version:', err.message)
-    process.exit(1)
-  }
-}
-
-async function getLatestReleaseVersion() {
-  if (!FORCE) {
-    const cached = await getCachedVersion('META_VERSION')
-    if (cached) {
-      META_VERSION = cached
-      return
-    }
-  }
-  const options = {}
-  const httpProxy =
-    process.env.HTTP_PROXY ||
-    process.env.http_proxy ||
-    process.env.HTTPS_PROXY ||
-    process.env.https_proxy
-  if (httpProxy) options.agent = new HttpsProxyAgent(httpProxy)
-
-  try {
-    const response = await fetch(META_VERSION_URL, {
-      ...options,
-      method: 'GET',
-    })
-    if (!response.ok)
-      throw new Error(`Failed to fetch ${META_VERSION_URL}: ${response.status}`)
-    META_VERSION = (await response.text()).trim()
-    log_info(`Latest release version: ${META_VERSION}`)
-    await setCachedVersion('META_VERSION', META_VERSION)
-  } catch (err) {
-    log_error('Error fetching latest release version:', err.message)
     process.exit(1)
   }
 }
@@ -650,8 +617,7 @@ const tasks = [
   },
   {
     name: 'verge-mihomo',
-    func: () =>
-      getLatestReleaseVersion().then(() => resolveSidecar(clashMeta())),
+    func: () => resolveSidecar(clashMeta()),
     retry: 5,
   },
   { name: 'plugin', func: resolvePlugin, retry: 5, winOnly: true },
