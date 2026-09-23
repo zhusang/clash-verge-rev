@@ -1,116 +1,103 @@
 <h1 align="center">
-  <img src="./src-tauri/icons/icon.png" alt="Clash" width="128" />
+  <img src="./src-tauri/icons/icon.png" alt="DinoVPN" width="128" />
   <br>
-  Continuation of <a href="https://github.com/zzzgydi/clash-verge">Clash Verge</a>
-  <br>
+  DinoVPN
 </h1>
 
-<h3 align="center">
-A Clash Meta GUI based on <a href="https://github.com/tauri-apps/tauri">Tauri</a>.
-</h3>
-
 <p align="center">
-  Languages:
-  <a href="./README.md">简体中文</a> ·
-  <a href="./docs/README_en.md">English</a> ·
-  <a href="./docs/README_es.md">Español</a> ·
-  <a href="./docs/README_ru.md">Русский</a> ·
-  <a href="./docs/README_ja.md">日本語</a> ·
-  <a href="./docs/README_ko.md">한국어</a> ·
-  <a href="./docs/README_fa.md">فارسی</a>
+  基于 Tauri 2 和 Mihomo 的跨平台代理客户端，支持 Windows、macOS 和 Linux。
 </p>
 
-## Preview
+<p align="center">
+  <a href="https://github.com/zhusang/clash-verge-rev/releases">下载安装</a> ·
+  <a href="./Changelog.md">更新日志</a> ·
+  <a href="https://github.com/zhusang/clash-verge-rev/issues">问题反馈</a>
+</p>
 
-| Dark                             | Light                             |
-| -------------------------------- | --------------------------------- |
-| ![预览](./docs/preview_dark.png) | ![预览](./docs/preview_light.png) |
+DinoVPN 是基于 [Clash Verge Rev](https://github.com/clash-verge-rev/clash-verge-rev) 维护的衍生版本。本仓库提供 DinoVPN 的源码和安装包，上游项目与依赖的致谢见文末。
 
-## Install
+## 主要功能
 
-请到发布页面下载对应的安装包：[Release page](https://github.com/clash-verge-rev/clash-verge-rev/releases)<br>
-Go to the [Release page](https://github.com/clash-verge-rev/clash-verge-rev/releases) to download the corresponding installation package<br>
-Supports Windows (x64/x86), Linux (x64/arm64) and macOS 11+ (intel/apple).
+- 内置 [Mihomo（Clash.Meta）](https://github.com/MetaCubeX/mihomo) 内核，支持切换稳定版与 Alpha 版内核。
+- 订阅与配置文件管理，支持 Merge 合并、Script 脚本增强和配置语法提示。
+- 系统代理、系统代理守卫和 TUN（虚拟网卡）模式。
+- 可视化节点与规则编辑。
+- 配置的本地备份与 WebDAV 备份管理。
+- 深色与浅色主题、自定义主题颜色、代理组及托盘图标、CSS 注入。
 
-#### 我应当怎样选择发行版
+## 界面预览
 
-| 版本        | 特征                                     | 链接                                                                                   |
-| :---------- | :--------------------------------------- | :------------------------------------------------------------------------------------- |
-| Stable      | 正式版，高可靠性，适合日常使用。         | [Release](https://github.com/clash-verge-rev/clash-verge-rev/releases)                 |
-| Alpha(废弃) | 测试发布流程。                           | [Alpha](https://github.com/clash-verge-rev/clash-verge-rev/releases/tag/alpha)         |
-| AutoBuild   | 滚动更新版，适合测试反馈，可能存在缺陷。 | [AutoBuild](https://github.com/clash-verge-rev/clash-verge-rev/releases/tag/autobuild) |
+以下图片用于展示界面布局，实际界面以当前版本为准。
 
-#### 安装说明和常见问题，请到 [文档页](https://clash-verge-rev.github.io/) 查看
+| 深色主题 | 浅色主题 |
+| --- | --- |
+| ![深色主题预览](./docs/preview_dark.png) | ![浅色主题预览](./docs/preview_light.png) |
 
----
+## 下载与安装
 
-### TG 频道: [@clash_verge_rev](https://t.me/clash_verge_re)
+前往 [本仓库 Releases 页面](https://github.com/zhusang/clash-verge-rev/releases)，展开对应版本下的 **Assets**，按操作系统和 CPU 架构选择安装包。可下载的平台和格式以实际发布附件为准。
 
-## Promotion
+| 平台 | 安装包选择 |
+| --- | --- |
+| Windows | 按设备架构选择 x64 或 ARM64 安装包。 |
+| macOS 11 及以上 | Intel 芯片选择 x64，Apple Silicon 选择 ARM64。 |
+| Linux | 按发行版、包格式和 CPU 架构选择对应安装包。 |
 
-### ✈️ [狗狗加速 —— 技术流机场 Doggygo VPN](https://verge.dginv.click/#/register?code=oaxsAGo6)
+### 版本选择
 
-🚀 高性能海外技术流机场，支持免费试用与优惠套餐，全面解锁流媒体及 AI 服务，全球首家采用 **QUIC 协议**。
+- **正式版**：在 Releases 中选择未标记为预发布的版本。
+- **AutoBuild**：用于测试的滚动构建，可能存在未修复问题；如已发布，可从 [AutoBuild 页面](https://github.com/zhusang/clash-verge-rev/releases/tag/autobuild) 下载。
 
-🎁 使用 **Clash Verge 专属邀请链接** 注册即送 **3 天免费试用**，每日 **1GB 流量**：👉 [点此注册](https://verge.dginv.click/#/register?code=oaxsAGo6)
+### 当前分支说明
 
-#### **核心优势：**
+- 应用自动更新已停用，升级时请手动下载并安装新版本。这不影响订阅更新和内核管理。
+- macOS 安装包采用无需开发者证书的 ad-hoc 签名，未经过 Apple 公证。首次启动可能受到 Gatekeeper 限制，请确认安装包来源可信。
 
-- 📱 自研 iOS 客户端（业内"唯一"）技术经得起考验，极大**持续研发**投入
-- 🧑‍💻 **12小时真人客服**(顺带解决 Clash Verge 使用问题)
-- 💰 优惠套餐每月**仅需 21 元，160G 流量，年付 8 折**
-- 🌍 海外团队，无跑路风险，高达 50% 返佣
-- ⚙️ **集群负载均衡**设计，**负载监控和随时扩容**，高速专线(兼容老客户端)，极低延迟，无视晚高峰，4K 秒开
-- ⚡ 全球首家**Quic 协议机场**，现已上线更快的 Tuic 协议(Clash Verge 客户端最佳搭配)
-- 🎬 解锁**流媒体及 主流 AI**
+## 使用帮助与反馈
 
-🌐 官网：👉 [https://狗狗加速.com](https://verge.dginv.click/#/register?code=oaxsAGo6)
+- 通用安装与使用方法可参考 [上游文档](https://clash-verge-rev.github.io/) 和 [常见问题](https://clash-verge-rev.github.io/faq/windows.html)。上游说明可能与 DinoVPN 当前版本存在差异。
+- DinoVPN 的问题请提交至 [本仓库 Issues](https://github.com/zhusang/clash-verge-rev/issues)，并附上系统、应用版本、复现步骤和相关日志。
+- 提交日志或截图前，请移除订阅地址、密码、令牌等敏感信息。
 
-## Features
+## 本地开发
 
-- 基于性能强劲的 Rust 和 Tauri 2 框架
-- 内置[Clash.Meta(mihomo)](https://github.com/MetaCubeX/mihomo)内核，并支持切换 `Alpha` 版本内核。
-- 简洁美观的用户界面，支持自定义主题颜色、代理组/托盘图标以及 `CSS Injection`。
-- 配置文件管理和增强（Merge 和 Script），配置文件语法提示。
-- 系统代理和守卫、`TUN(虚拟网卡)` 模式。
-- 可视化节点和规则编辑
-- WebDav 配置备份和同步
+### 环境准备
 
-### FAQ
+- Node.js：建议与 CI 使用的 `24.14.1` 保持一致。
+- Rust：使用 [rust-toolchain.toml](./rust-toolchain.toml) 指定的工具链。
+- pnpm：使用 [package.json](./package.json) 中指定的 `10.32.1`。
+- 按 [Tauri 2 环境准备文档](https://v2.tauri.app/start/prerequisites/) 安装对应平台的系统依赖。
 
-Refer to [Doc FAQ Page](https://clash-verge-rev.github.io/faq/windows.html)
-
-### Donation
-
-[捐助Clash Verge Rev的开发](https://github.com/sponsors/clash-verge-rev)
-
-## Development
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for more details.
-
-To run the development server, execute the following commands after all prerequisites for **Tauri** are installed:
+### 安装依赖并启动
 
 ```shell
-pnpm i
+pnpm install
 pnpm run prebuild
 pnpm dev
 ```
 
-## Contributions
+`prebuild` 会下载 Mihomo 内核和服务二进制文件，需要能够访问相应的下载源。`pnpm dev` 启动完整的 Tauri 桌面应用。
 
-Issue and PR welcome!
+### 构建安装包
 
-## Acknowledgement
+```shell
+pnpm build
+```
 
-Clash Verge rev was based on or inspired by these projects and so on:
+更多开发与贡献说明见 [CONTRIBUTING.md](./CONTRIBUTING.md)。欢迎向本仓库提交 Issue 和 Pull Request。
 
-- [zzzgydi/clash-verge](https://github.com/zzzgydi/clash-verge): A Clash GUI based on tauri. Supports Windows, macOS and Linux.
-- [tauri-apps/tauri](https://github.com/tauri-apps/tauri): Build smaller, faster, and more secure desktop applications with a web frontend.
-- [Dreamacro/clash](https://github.com/Dreamacro/clash): A rule-based tunnel in Go.
-- [MetaCubeX/mihomo](https://github.com/MetaCubeX/mihomo): A rule-based tunnel in Go.
-- [Fndroid/clash_for_windows_pkg](https://github.com/Fndroid/clash_for_windows_pkg): A Windows/macOS GUI based on Clash.
-- [vitejs/vite](https://github.com/vitejs/vite): Next generation frontend tooling. It's fast!
+## 致谢
 
-## License
+本项目基于 Clash Verge Rev，并受益于以下开源项目及其贡献者：
 
-GPL-3.0 License. See [License here](./LICENSE) for details.
+- [Clash Verge Rev](https://github.com/clash-verge-rev/clash-verge-rev)：本项目的上游基础。
+- [Clash Verge](https://github.com/zzzgydi/clash-verge)：基于 Tauri 的跨平台 Clash 图形客户端。
+- [Tauri](https://github.com/tauri-apps/tauri)：桌面应用框架。
+- [Clash](https://github.com/Dreamacro/clash)：基于规则的网络隧道工具。
+- [Mihomo](https://github.com/MetaCubeX/mihomo)：本项目使用的代理内核。
+- [Clash for Windows](https://github.com/Fndroid/clash_for_windows_pkg)：Clash 图形客户端。
+- [Vite](https://github.com/vitejs/vite)：前端构建工具。
+
+## 许可证
+
+本项目采用 GPL-3.0 许可证，详见 [LICENSE](./LICENSE)。
