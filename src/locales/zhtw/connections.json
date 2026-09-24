@@ -41,13 +41,22 @@
       },
       "fields": {
         "total": "合計",
-        "share": "占比"
+        "share": "占比",
+        "route": "出口"
+      },
+      "routes": {
+        "all": "全部出口",
+        "proxy": "代理",
+        "direct": "直連",
+        "mixed": "混合 · 直連 {{percent}}%"
       },
       "unknownProcess": "未知處理程序",
       "tooltips": {
         "unknownProcess": "核心未回報處理程序名稱。請在核心設定中將 find-process-mode 設為 always，或使用虛擬網路介面卡模式。",
         "approximate": "統計值為近似值：連線關閉前最後一秒內傳輸的位元組不會計入。",
-        "drillDown": "點擊處理程序可查看它存取過的主機"
+        "drillDown": "點擊處理程序可查看它存取過的主機",
+        "drillDownHost": "點擊主機可查看它使用過的出口節點",
+        "routeSplit": "代理：{{proxy}} · 直連：{{direct}}"
       },
       "actions": {
         "back": "返回"

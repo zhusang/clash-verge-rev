@@ -4,7 +4,6 @@ import {
   Box,
   Button,
   Chip,
-  LinearProgress,
   MenuItem,
   Tooltip,
   Typography,
@@ -18,7 +17,9 @@ import { BaseEmpty, BaseStyledSelect, VirtualList } from '@/components/base'
 import {
   TRAFFIC_USAGE_GROUPS,
   TRAFFIC_USAGE_PERIODS,
+  TRAFFIC_USAGE_ROUTES,
   type TrafficUsagePeriod,
+  type TrafficUsageRouteFilter,
   type TrafficUsageViewState,
   useTrafficUsage,
   useTrafficUsageStatus,
@@ -30,6 +31,7 @@ import parseTraffic from '@/utils/parse-traffic'
 const UNKNOWN_KEY = 'unknown'
 const ROW_HEIGHT = 40
 const NUMBER_COL_WIDTH = 96
+const ROUTE_COL_WIDTH = 132
 const SHARE_COL_WIDTH = 150
 
 const PERIOD_LABELS: Record<TrafficUsagePeriod, TranslationKey> = {
@@ -43,6 +45,20 @@ const GROUP_LABELS: Record<TrafficUsageGroupBy, TranslationKey> = {
   process: 'connections.components.usage.groupBy.process',
   host: 'connections.components.usage.groupBy.host',
   proxy: 'connections.components.usage.groupBy.proxy',
+}
+
+const ROUTE_LABELS: Record<TrafficUsageRouteFilter, TranslationKey> = {
+  all: 'connections.components.usage.routes.all',
+  proxy: 'connections.components.usage.routes.proxy',
+  direct: 'connections.components.usage.routes.direct',
+}
+
+/** Where a click on a row leads; `proxy` rows are the deepest level. */
+const DRILL_DOWN_TOOLTIPS: Partial<
+  Record<TrafficUsageGroupBy, TranslationKey>
+> = {
+  process: 'connections.components.usage.tooltips.drillDown',
+  host: 'connections.components.usage.tooltips.drillDownHost',
 }
 
 interface Props {
@@ -64,18 +80,25 @@ export const TrafficUsageView = ({ active, state, onStateChange }: Props) => {
   const { t } = useTranslation()
   const theme = useTheme()
   const navigate = useNavigate()
-  const { period, groupBy, processFilter } = state
+  const { period, groupBy, route, processFilter, hostFilter } = state
 
   const { data: status } = useTrafficUsageStatus(active)
   const { data: rows = [], isLoading } = useTrafficUsage({
     period,
     groupBy,
-    filter: processFilter ? { process: processFilter } : undefined,
+    filter: {
+      process: processFilter ?? undefined,
+      host: hostFilter ?? undefined,
+      route: route === 'all' ? undefined : route,
+    },
     enabled: active,
   })
 
   const grandTotal = rows.reduce((sum, row) => sum + row.total, 0)
-  const canDrillDown = groupBy === 'process' && !processFilter
+  const drillDownTooltip = DRILL_DOWN_TOOLTIPS[groupBy]
+  const canDrillDown = drillDownTooltip !== undefined
+  const proxyColor = theme.palette.primary.main
+  const directColor = theme.palette.success.main
 
   const unknownProcessLabel = t('connections.components.usage.unknownProcess')
   const processLabel = (key: string) =>
@@ -84,17 +107,44 @@ export const TrafficUsageView = ({ active, state, onStateChange }: Props) => {
     groupBy === 'process' ? processLabel(key) : key
 
   const drillInto = (row: ITrafficUsageRow) => {
-    if (!canDrillDown) return
-    onStateChange({ ...state, groupBy: 'host', processFilter: row.key })
+    if (groupBy === 'process') {
+      onStateChange({ ...state, groupBy: 'host', processFilter: row.key })
+    } else if (groupBy === 'host') {
+      onStateChange({ ...state, groupBy: 'proxy', hostFilter: row.key })
+    }
   }
 
   const goBack = () =>
-    onStateChange({ ...state, groupBy: 'process', processFilter: null })
+    onStateChange(
+      hostFilter
+        ? { ...state, groupBy: 'host', hostFilter: null }
+        : { ...state, groupBy: 'process', processFilter: null },
+    )
+
+  const routeLabelOf = (row: ITrafficUsageRow) => {
+    if (row.direct <= 0) {
+      return t('connections.components.usage.routes.proxy')
+    }
+    if (row.direct >= row.total) {
+      return t('connections.components.usage.routes.direct')
+    }
+    return t('connections.components.usage.routes.mixed', {
+      percent: Math.round((row.direct / row.total) * 100),
+    })
+  }
 
   const renderRow = (index: number) => {
     const row = rows[index]
     if (!row) return null
-    const share = grandTotal > 0 ? (row.total / grandTotal) * 100 : 0
+    const proxied = row.total - row.direct
+    const routeLabel = routeLabelOf(row)
+    const routeSplit = t('connections.components.usage.tooltips.routeSplit', {
+      proxy: formatBytes(proxied),
+      direct: formatBytes(row.direct),
+    })
+    const proxyShare = grandTotal > 0 ? (proxied / grandTotal) * 100 : 0
+    const directShare = grandTotal > 0 ? (row.direct / grandTotal) * 100 : 0
+    const share = proxyShare + directShare
     const isUnknown = groupBy === 'process' && row.key === UNKNOWN_KEY
     const name = (
       <Typography
@@ -109,7 +159,15 @@ export const TrafficUsageView = ({ active, state, onStateChange }: Props) => {
 
     return (
       <Box
+        role={canDrillDown ? 'button' : undefined}
+        tabIndex={canDrillDown ? 0 : undefined}
         onClick={() => drillInto(row)}
+        onKeyDown={(event) => {
+          if (canDrillDown && (event.key === 'Enter' || event.key === ' ')) {
+            event.preventDefault()
+            drillInto(row)
+          }
+        }}
         sx={{
           display: 'flex',
           alignItems: 'center',
@@ -137,32 +195,66 @@ export const TrafficUsageView = ({ active, state, onStateChange }: Props) => {
         <Box sx={{ ...numberCellSx, fontWeight: 600 }}>
           {formatBytes(row.total)}
         </Box>
-        <Box
-          sx={{
-            flex: `0 0 ${SHARE_COL_WIDTH}px`,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-            px: 1,
-          }}
-        >
-          <LinearProgress
-            variant="determinate"
-            value={Math.min(100, share)}
+        <Tooltip title={`${routeLabel} · ${routeSplit}`} placement="top">
+          <Box
             sx={{
-              flex: 1,
-              height: 6,
-              borderRadius: 3,
-              backgroundColor: alpha(theme.palette.primary.main, 0.12),
+              flex: `0 0 ${ROUTE_COL_WIDTH}px`,
+              px: 1,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              color:
+                row.direct <= 0
+                  ? proxyColor
+                  : proxied <= 0
+                    ? directColor
+                    : undefined,
             }}
-          />
-          <Typography
-            variant="caption"
-            sx={{ width: 44, textAlign: 'right', whiteSpace: 'nowrap' }}
           >
-            {share.toFixed(1)}%
-          </Typography>
-        </Box>
+            {routeLabel}
+          </Box>
+        </Tooltip>
+        <Tooltip title={routeSplit} placement="top">
+          <Box
+            sx={{
+              flex: `0 0 ${SHARE_COL_WIDTH}px`,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              px: 1,
+            }}
+          >
+            <Box
+              sx={{
+                flex: 1,
+                display: 'flex',
+                height: 6,
+                borderRadius: 3,
+                overflow: 'hidden',
+                backgroundColor: alpha(proxyColor, 0.12),
+              }}
+            >
+              <Box
+                sx={{
+                  width: `${Math.min(100, proxyShare)}%`,
+                  backgroundColor: proxyColor,
+                }}
+              />
+              <Box
+                sx={{
+                  width: `${Math.min(100, directShare)}%`,
+                  backgroundColor: directColor,
+                }}
+              />
+            </Box>
+            <Typography
+              variant="caption"
+              sx={{ width: 44, textAlign: 'right', whiteSpace: 'nowrap' }}
+            >
+              {share.toFixed(1)}%
+            </Typography>
+          </Box>
+        </Tooltip>
       </Box>
     )
   }
@@ -177,7 +269,15 @@ export const TrafficUsageView = ({ active, state, onStateChange }: Props) => {
         mx: '10px',
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: 1,
+          mb: 1,
+        }}
+      >
         <BaseStyledSelect
           value={period}
           onChange={(e) =>
@@ -201,6 +301,7 @@ export const TrafficUsageView = ({ active, state, onStateChange }: Props) => {
               ...state,
               groupBy: e.target.value as TrafficUsageGroupBy,
               processFilter: null,
+              hostFilter: null,
             })
           }
         >
@@ -211,21 +312,46 @@ export const TrafficUsageView = ({ active, state, onStateChange }: Props) => {
           ))}
         </BaseStyledSelect>
 
+        <BaseStyledSelect
+          value={route}
+          onChange={(e) =>
+            onStateChange({
+              ...state,
+              route: e.target.value as TrafficUsageRouteFilter,
+            })
+          }
+        >
+          {TRAFFIC_USAGE_ROUTES.map((option) => (
+            <MenuItem key={option} value={option}>
+              <span style={{ fontSize: 14 }}>{t(ROUTE_LABELS[option])}</span>
+            </MenuItem>
+          ))}
+        </BaseStyledSelect>
+
+        {(processFilter || hostFilter) && (
+          <Button
+            size="small"
+            startIcon={<ArrowBackRounded />}
+            onClick={goBack}
+          >
+            {t('connections.components.usage.actions.back')}
+          </Button>
+        )}
         {processFilter && (
-          <>
-            <Button
-              size="small"
-              startIcon={<ArrowBackRounded />}
-              onClick={goBack}
-            >
-              {t('connections.components.usage.actions.back')}
-            </Button>
-            <Chip
-              size="small"
-              label={processLabel(processFilter)}
-              title={processFilter}
-            />
-          </>
+          <Chip
+            size="small"
+            label={processLabel(processFilter)}
+            title={processFilter}
+            sx={{ maxWidth: 200 }}
+          />
+        )}
+        {hostFilter && (
+          <Chip
+            size="small"
+            label={hostFilter}
+            title={hostFilter}
+            sx={{ maxWidth: 200 }}
+          />
         )}
 
         <Box sx={{ flex: 1 }} />
@@ -272,11 +398,7 @@ export const TrafficUsageView = ({ active, state, onStateChange }: Props) => {
         }}
       >
         <Tooltip
-          title={
-            canDrillDown
-              ? t('connections.components.usage.tooltips.drillDown')
-              : ''
-          }
+          title={drillDownTooltip ? t(drillDownTooltip) : ''}
           placement="top-start"
         >
           <Typography
@@ -291,6 +413,9 @@ export const TrafficUsageView = ({ active, state, onStateChange }: Props) => {
         <Box sx={numberCellSx}>
           {t('connections.components.usage.fields.total')}
         </Box>
+        <Box sx={{ flex: `0 0 ${ROUTE_COL_WIDTH}px`, px: 1 }}>
+          {t('connections.components.usage.fields.route')}
+        </Box>
         <Box sx={{ flex: `0 0 ${SHARE_COL_WIDTH}px`, px: 1 }}>
           {t('connections.components.usage.fields.share')}
         </Box>
@@ -300,6 +425,13 @@ export const TrafficUsageView = ({ active, state, onStateChange }: Props) => {
         !isLoading && <BaseEmpty textKey="connections.components.usage.empty" />
       ) : (
         <VirtualList
+          key={JSON.stringify([
+            period,
+            groupBy,
+            route,
+            processFilter,
+            hostFilter,
+          ])}
           count={rows.length}
           estimateSize={ROW_HEIGHT}
           renderItem={renderRow}

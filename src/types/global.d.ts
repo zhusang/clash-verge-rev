@@ -243,6 +243,9 @@ interface IConnections {
 /** Aggregation dimension for traffic usage history */
 type TrafficUsageGroupBy = 'process' | 'host' | 'proxy'
 
+/** Outbound route: `DIRECT` vs. any proxy node */
+type TrafficUsageRoute = 'direct' | 'proxy'
+
 interface ITrafficUsageRange {
   /** inclusive, unix seconds */
   sinceTs: number
@@ -254,6 +257,7 @@ interface ITrafficUsageFilter {
   process?: string
   host?: string
   proxy?: string
+  route?: TrafficUsageRoute
 }
 
 interface ITrafficUsageRow {
@@ -261,6 +265,8 @@ interface ITrafficUsageRow {
   upload: number
   download: number
   total: number
+  /** Part of `total` sent through `DIRECT`; the rest went through proxies */
+  direct: number
 }
 
 interface ITrafficUsageStatus {

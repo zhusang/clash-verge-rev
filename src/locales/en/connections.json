@@ -41,13 +41,22 @@
       },
       "fields": {
         "total": "Total",
-        "share": "Share"
+        "share": "Share",
+        "route": "Outbound"
+      },
+      "routes": {
+        "all": "All outbounds",
+        "proxy": "Proxy",
+        "direct": "Direct",
+        "mixed": "Mixed · {{percent}}% direct"
       },
       "unknownProcess": "Unknown process",
       "tooltips": {
         "unknownProcess": "mihomo did not report the process. Set find-process-mode to always in the core config, or use TUN mode.",
         "approximate": "Usage is approximate: bytes sent in the last second before a connection closes are not counted.",
-        "drillDown": "Click a process to see the hosts it accessed"
+        "drillDown": "Click a process to see the hosts it accessed",
+        "drillDownHost": "Click a host to see the outbound nodes it used",
+        "routeSplit": "Proxy: {{proxy}} · Direct: {{direct}}"
       },
       "actions": {
         "back": "Back"

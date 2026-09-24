@@ -41,13 +41,22 @@
       },
       "fields": {
         "total": "Total",
-        "share": "Share"
+        "share": "Share",
+        "route": "연결 경로"
+      },
+      "routes": {
+        "all": "모든 경로",
+        "proxy": "프록시",
+        "direct": "직접 연결",
+        "mixed": "혼합 · 직접 {{percent}}%"
       },
       "unknownProcess": "Unknown process",
       "tooltips": {
         "unknownProcess": "mihomo did not report the process. Set find-process-mode to always in the core config, or use TUN mode.",
         "approximate": "Usage is approximate: bytes sent in the last second before a connection closes are not counted.",
-        "drillDown": "Click a process to see the hosts it accessed"
+        "drillDown": "Click a process to see the hosts it accessed",
+        "drillDownHost": "호스트를 클릭하면 사용한 출구 노드를 볼 수 있습니다",
+        "routeSplit": "프록시: {{proxy}} · 직접 연결: {{direct}}"
       },
       "actions": {
         "back": "Back"

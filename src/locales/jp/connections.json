@@ -41,13 +41,22 @@
       },
       "fields": {
         "total": "Total",
-        "share": "Share"
+        "share": "Share",
+        "route": "接続経路"
+      },
+      "routes": {
+        "all": "すべての経路",
+        "proxy": "プロキシ",
+        "direct": "直接接続",
+        "mixed": "混在 · 直接 {{percent}}%"
       },
       "unknownProcess": "Unknown process",
       "tooltips": {
         "unknownProcess": "mihomo did not report the process. Set find-process-mode to always in the core config, or use TUN mode.",
         "approximate": "Usage is approximate: bytes sent in the last second before a connection closes are not counted.",
-        "drillDown": "Click a process to see the hosts it accessed"
+        "drillDown": "Click a process to see the hosts it accessed",
+        "drillDownHost": "ホストをクリックすると、使用した出口ノードを表示します",
+        "routeSplit": "プロキシ: {{proxy}} · 直接接続: {{direct}}"
       },
       "actions": {
         "back": "Back"

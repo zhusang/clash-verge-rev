@@ -41,13 +41,22 @@
       },
       "fields": {
         "total": "Total",
-        "share": "Share"
+        "share": "Share",
+        "route": "مسار الخروج"
+      },
+      "routes": {
+        "all": "جميع المسارات",
+        "proxy": "وكيل",
+        "direct": "مباشر",
+        "mixed": "مختلط · {{percent}}٪ مباشر"
       },
       "unknownProcess": "Unknown process",
       "tooltips": {
         "unknownProcess": "mihomo did not report the process. Set find-process-mode to always in the core config, or use TUN mode.",
         "approximate": "Usage is approximate: bytes sent in the last second before a connection closes are not counted.",
-        "drillDown": "Click a process to see the hosts it accessed"
+        "drillDown": "Click a process to see the hosts it accessed",
+        "drillDownHost": "انقر على المضيف لعرض عقد الخروج التي استخدمها",
+        "routeSplit": "وكيل: {{proxy}} · مباشر: {{direct}}"
       },
       "actions": {
         "back": "Back"

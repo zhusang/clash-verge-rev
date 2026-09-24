@@ -38,6 +38,7 @@ export interface TranslationResources {
           }
           empty: string
           fields: {
+            route: string
             share: string
             total: string
           }
@@ -52,6 +53,12 @@ export interface TranslationResources {
             last7d: string
             today: string
           }
+          routes: {
+            all: string
+            direct: string
+            mixed: string
+            proxy: string
+          }
           statuses: {
             disabled: string
             notCollecting: string
@@ -61,6 +68,8 @@ export interface TranslationResources {
           tooltips: {
             approximate: string
             drillDown: string
+            drillDownHost: string
+            routeSplit: string
             unknownProcess: string
           }
           unknownProcess: string

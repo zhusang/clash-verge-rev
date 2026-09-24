@@ -17,18 +17,31 @@ export const TRAFFIC_USAGE_GROUPS: readonly TrafficUsageGroupBy[] = [
   'proxy',
 ]
 
+export type TrafficUsageRouteFilter = TrafficUsageRoute | 'all'
+
+export const TRAFFIC_USAGE_ROUTES: readonly TrafficUsageRouteFilter[] = [
+  'all',
+  'proxy',
+  'direct',
+]
+
 /** View state of the traffic usage tab, owned by the connections page. */
 export interface TrafficUsageViewState {
   period: TrafficUsagePeriod
   groupBy: TrafficUsageGroupBy
+  route: TrafficUsageRouteFilter
   /** Set while drilling down from a process into the hosts it accessed. */
   processFilter: string | null
+  /** Set while drilling down from a host into the nodes it went through. */
+  hostFilter: string | null
 }
 
 export const initialTrafficUsageViewState: TrafficUsageViewState = {
   period: 'today',
   groupBy: 'process',
+  route: 'all',
   processFilter: null,
+  hostFilter: null,
 }
 
 /** Matches the backend flush cadence; polling faster shows nothing new. */
@@ -71,6 +84,7 @@ export const useTrafficUsage = ({
     ...(filter?.process ? { process: filter.process } : {}),
     ...(filter?.host ? { host: filter.host } : {}),
     ...(filter?.proxy ? { proxy: filter.proxy } : {}),
+    ...(filter?.route ? { route: filter.route } : {}),
   }
   const hasFilter = Object.keys(normalizedFilter).length > 0
 
@@ -87,7 +101,6 @@ export const useTrafficUsage = ({
     enabled,
     staleTime: STALE_TIME_MS,
     refetchInterval: enabled ? REFRESH_INTERVAL_MS : false,
-    placeholderData: (previous) => previous,
   })
 }
 

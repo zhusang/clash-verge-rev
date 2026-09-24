@@ -41,13 +41,22 @@
       },
       "fields": {
         "total": "合计",
-        "share": "占比"
+        "share": "占比",
+        "route": "出口"
+      },
+      "routes": {
+        "all": "全部出口",
+        "proxy": "代理",
+        "direct": "直连",
+        "mixed": "混合 · 直连 {{percent}}%"
       },
       "unknownProcess": "未知进程",
       "tooltips": {
         "unknownProcess": "内核未报告进程名。请在内核配置中把 find-process-mode 设为 always，或使用虚拟网卡模式。",
         "approximate": "统计值为近似值：连接关闭前最后一秒内传输的字节不会计入。",
-        "drillDown": "点击进程可查看它访问过的主机"
+        "drillDown": "点击进程可查看它访问过的主机",
+        "drillDownHost": "点击主机可查看它使用过的出口节点",
+        "routeSplit": "代理：{{proxy}} · 直连：{{direct}}"
       },
       "actions": {
         "back": "返回"

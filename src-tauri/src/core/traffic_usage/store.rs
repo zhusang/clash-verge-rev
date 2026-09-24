@@ -19,6 +19,8 @@ pub const DB_FILE: &str = "traffic_usage.db";
 const SCHEMA_VERSION: i32 = 1;
 /// Upper bound on rows returned by one query; keeps the IPC payload small.
 const MAX_ROWS: usize = 500;
+/// Outbound name mihomo reports for connections that bypass every proxy.
+const DIRECT: &str = "DIRECT";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -34,6 +36,24 @@ impl GroupBy {
             Self::Process => "process",
             Self::Host => "host",
             Self::Proxy => "proxy",
+        }
+    }
+}
+
+/// Whether traffic left through `DIRECT` or through any other outbound.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Route {
+    Direct,
+    Proxy,
+}
+
+impl Route {
+    /// Comparison against [`DIRECT`] selecting the rows of this route.
+    const fn operator(self) -> &'static str {
+        match self {
+            Self::Direct => "=",
+            Self::Proxy => "<>",
         }
     }
 }
@@ -55,6 +75,8 @@ pub struct UsageFilter {
     pub host: Option<String>,
     #[serde(default)]
     pub proxy: Option<String>,
+    #[serde(default)]
+    pub route: Option<Route>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -64,6 +86,8 @@ pub struct UsageRow {
     pub upload: u64,
     pub download: u64,
     pub total: u64,
+    /// Part of `total` that went out through `DIRECT`; the rest was proxied.
+    pub direct: u64,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -138,9 +162,13 @@ impl Store {
     pub fn query(&self, range: UsageRange, group_by: GroupBy, filter: &UsageFilter) -> Result<Vec<UsageRow>> {
         let column = group_by.column();
         let mut sql = format!(
-            "SELECT {column} AS k, SUM(upload) AS up, SUM(download) AS down, SUM(upload + download) AS total
+            "SELECT {column} AS k, SUM(upload) AS up, SUM(download) AS down, SUM(upload + download) AS total,
+                    SUM(CASE WHEN proxy = '{DIRECT}' THEN upload + download ELSE 0 END) AS direct
              FROM usage_hourly WHERE bucket_ts >= ?1 AND bucket_ts < ?2"
         );
+        if let Some(route) = filter.route {
+            sql.push_str(&format!(" AND proxy {} '{DIRECT}'", route.operator()));
+        }
         let mut args: Vec<Value> = vec![Value::Integer(range.since_ts), Value::Integer(range.until_ts)];
         for (name, value) in [
             ("process", &filter.process),
@@ -163,6 +191,7 @@ impl Store {
                 upload: from_i64(row.get(1)?),
                 download: from_i64(row.get(2)?),
                 total: from_i64(row.get(3)?),
+                direct: from_i64(row.get(4)?),
             })
         })?;
         let rows = mapped.collect::<rusqlite::Result<Vec<_>>>()?;
@@ -339,6 +368,188 @@ mod tests {
             &UsageFilter::default(),
         )?;
         assert!(rows.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn query_splits_direct_and_filters_by_route() -> Result<()> {
+        let store = seeded()?;
+        store.upsert_batch(&[(
+            key(3600, "chrome.exe", "a.com", DIRECT),
+            Bytes {
+                upload: 5,
+                download: 45,
+            },
+        )])?;
+        let range = UsageRange {
+            since_ts: 0,
+            until_ts: 10_000,
+        };
+
+        let rows = store.query(range, GroupBy::Host, &UsageFilter::default())?;
+        assert_eq!(rows.len(), 2);
+        assert_eq!(
+            (rows[0].key.as_str(), rows[0].total, rows[0].direct),
+            ("a.com", 440, 50)
+        );
+        assert_eq!((rows[1].key.as_str(), rows[1].total, rows[1].direct), ("b.com", 220, 0));
+
+        let rows = store.query(
+            range,
+            GroupBy::Host,
+            &UsageFilter {
+                route: Some(Route::Direct),
+                ..UsageFilter::default()
+            },
+        )?;
+        assert_eq!(rows.len(), 1);
+        assert_eq!((rows[0].key.as_str(), rows[0].total, rows[0].direct), ("a.com", 50, 50));
+
+        let rows = store.query(
+            range,
+            GroupBy::Host,
+            &UsageFilter {
+                route: Some(Route::Proxy),
+                ..UsageFilter::default()
+            },
+        )?;
+        assert_eq!(rows.len(), 2);
+        assert_eq!((rows[0].key.as_str(), rows[0].total, rows[0].direct), ("a.com", 390, 0));
+        Ok(())
+    }
+
+    #[test]
+    fn route_split_respects_process_host_and_time_filters() -> Result<()> {
+        let store = seeded()?;
+        store.upsert_batch(&[(
+            key(3600, "chrome.exe", "a.com", DIRECT),
+            Bytes {
+                upload: 5,
+                download: 45,
+            },
+        )])?;
+        let range = UsageRange {
+            since_ts: 3600,
+            until_ts: 7200,
+        };
+        let rows = store.query(range, GroupBy::Process, &UsageFilter::default())?;
+        assert_eq!(rows.len(), 1);
+        assert_eq!((rows[0].total, rows[0].direct), (380, 50));
+
+        let mut filter = UsageFilter {
+            process: Some("chrome.exe".to_owned()),
+            host: Some("a.com".to_owned()),
+            ..UsageFilter::default()
+        };
+        let rows = store.query(range, GroupBy::Proxy, &filter)?;
+        assert_eq!(rows.len(), 2);
+        assert_eq!((rows[0].key.as_str(), rows[0].total, rows[0].direct), ("HK-01", 110, 0));
+        assert_eq!((rows[1].key.as_str(), rows[1].total, rows[1].direct), (DIRECT, 50, 50));
+
+        filter.route = Some(Route::Direct);
+        let rows = store.query(range, GroupBy::Proxy, &filter)?;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(
+            (rows[0].upload, rows[0].download, rows[0].total, rows[0].direct),
+            (5, 45, 50, 50)
+        );
+
+        filter.proxy = Some("HK-01".to_owned());
+        assert!(store.query(range, GroupBy::Proxy, &filter)?.is_empty());
+        filter.route = Some(Route::Proxy);
+        let rows = store.query(range, GroupBy::Proxy, &filter)?;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(
+            (rows[0].upload, rows[0].download, rows[0].total, rows[0].direct),
+            (10, 100, 110, 0)
+        );
+
+        filter.process = Some("curl".to_owned());
+        assert!(store.query(range, GroupBy::Proxy, &filter)?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn route_filter_applies_before_ranking_and_limit() -> Result<()> {
+        let store = Store::open_in_memory()?;
+        let rows: Vec<_> = (0..MAX_ROWS)
+            .map(|i| {
+                (
+                    key(3600, "browser", &format!("proxy-{i}.test"), "HK-01"),
+                    Bytes {
+                        upload: 0,
+                        download: 100,
+                    },
+                )
+            })
+            .collect();
+        store.upsert_batch(&rows)?;
+        store.upsert_batch(&[
+            (
+                key(3600, "browser", "direct.test", DIRECT),
+                Bytes { upload: 0, download: 1 },
+            ),
+            (
+                key(3600, "browser", "mixed.test", DIRECT),
+                Bytes {
+                    upload: 0,
+                    download: 1000,
+                },
+            ),
+            (
+                key(3600, "browser", "mixed.test", "US-01"),
+                Bytes { upload: 0, download: 2 },
+            ),
+        ])?;
+        let range = UsageRange {
+            since_ts: 0,
+            until_ts: 7200,
+        };
+        let rows = store.query(range, GroupBy::Host, &UsageFilter::default())?;
+        assert_eq!(rows.len(), MAX_ROWS);
+        assert_eq!(rows[0].key, "mixed.test");
+
+        let rows = store.query(
+            range,
+            GroupBy::Host,
+            &UsageFilter {
+                route: Some(Route::Direct),
+                ..UsageFilter::default()
+            },
+        )?;
+        assert_eq!(rows.len(), 2);
+        assert_eq!(
+            (rows[0].key.as_str(), rows[0].total, rows[0].direct),
+            ("mixed.test", 1000, 1000)
+        );
+        assert_eq!(
+            (rows[1].key.as_str(), rows[1].total, rows[1].direct),
+            ("direct.test", 1, 1)
+        );
+
+        let rows = store.query(
+            range,
+            GroupBy::Host,
+            &UsageFilter {
+                route: Some(Route::Proxy),
+                ..UsageFilter::default()
+            },
+        )?;
+        assert_eq!(rows.len(), MAX_ROWS);
+        assert!(rows.iter().all(|row| row.total == 100 && row.direct == 0));
+        Ok(())
+    }
+
+    #[test]
+    fn route_ipc_values_are_lowercase_and_optional() -> Result<()> {
+        let old_filter: UsageFilter = serde_json::from_str(r#"{"host":"a.com"}"#)?;
+        assert_eq!(old_filter.route, None);
+        for (value, route) in [("direct", Route::Direct), ("proxy", Route::Proxy)] {
+            let filter: UsageFilter = serde_json::from_value(serde_json::json!({ "route": value }))?;
+            assert_eq!(filter.route, Some(route));
+            assert_eq!(serde_json::to_value(&filter)?["route"], value);
+        }
+        assert!(serde_json::from_str::<UsageFilter>(r#"{"route":"all"}"#).is_err());
         Ok(())
     }
 

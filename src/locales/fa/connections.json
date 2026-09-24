@@ -41,13 +41,22 @@
       },
       "fields": {
         "total": "Total",
-        "share": "Share"
+        "share": "Share",
+        "route": "مسیر خروجی"
+      },
+      "routes": {
+        "all": "همهٔ مسیرها",
+        "proxy": "پروکسی",
+        "direct": "مستقیم",
+        "mixed": "ترکیبی · {{percent}}٪ مستقیم"
       },
       "unknownProcess": "Unknown process",
       "tooltips": {
         "unknownProcess": "mihomo did not report the process. Set find-process-mode to always in the core config, or use TUN mode.",
         "approximate": "Usage is approximate: bytes sent in the last second before a connection closes are not counted.",
-        "drillDown": "Click a process to see the hosts it accessed"
+        "drillDown": "Click a process to see the hosts it accessed",
+        "drillDownHost": "برای مشاهدهٔ گره‌های خروجی استفاده‌شده، روی میزبان کلیک کنید",
+        "routeSplit": "پروکسی: {{proxy}} · مستقیم: {{direct}}"
       },
       "actions": {
         "back": "Back"

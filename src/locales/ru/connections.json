@@ -41,13 +41,22 @@
       },
       "fields": {
         "total": "Total",
-        "share": "Share"
+        "share": "Share",
+        "route": "Маршрут"
+      },
+      "routes": {
+        "all": "Все маршруты",
+        "proxy": "Прокси",
+        "direct": "Напрямую",
+        "mixed": "Смешанный · {{percent}}% напрямую"
       },
       "unknownProcess": "Unknown process",
       "tooltips": {
         "unknownProcess": "mihomo did not report the process. Set find-process-mode to always in the core config, or use TUN mode.",
         "approximate": "Usage is approximate: bytes sent in the last second before a connection closes are not counted.",
-        "drillDown": "Click a process to see the hosts it accessed"
+        "drillDown": "Click a process to see the hosts it accessed",
+        "drillDownHost": "Нажмите на хост, чтобы увидеть использованные выходные узлы",
+        "routeSplit": "Прокси: {{proxy}} · Напрямую: {{direct}}"
       },
       "actions": {
         "back": "Back"

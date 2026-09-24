@@ -41,13 +41,22 @@
       },
       "fields": {
         "total": "Total",
-        "share": "Share"
+        "share": "Share",
+        "route": "Çıkış"
+      },
+      "routes": {
+        "all": "Tüm çıkışlar",
+        "proxy": "Proxy",
+        "direct": "Doğrudan",
+        "mixed": "Karma · %{{percent}} doğrudan"
       },
       "unknownProcess": "Unknown process",
       "tooltips": {
         "unknownProcess": "mihomo did not report the process. Set find-process-mode to always in the core config, or use TUN mode.",
         "approximate": "Usage is approximate: bytes sent in the last second before a connection closes are not counted.",
-        "drillDown": "Click a process to see the hosts it accessed"
+        "drillDown": "Click a process to see the hosts it accessed",
+        "drillDownHost": "Kullandığı çıkış düğümlerini görmek için bir ana bilgisayara tıklayın",
+        "routeSplit": "Proxy: {{proxy}} · Doğrudan: {{direct}}"
       },
       "actions": {
         "back": "Back"
