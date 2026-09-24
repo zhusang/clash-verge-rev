@@ -97,7 +97,9 @@ backon = { version = "1.6.0", features = ["tokio-sleep"] }
 tauri-plugin-http = "2.5.7"
 console-subscriber = { version = "0.5.0", optional = true }
 tauri-plugin-devtools = { version = "2.0.1" }
-tauri-plugin-mihomo = { git = "https://github.com/clash-verge-rev/tauri-plugin-mihomo", branch = "revert" }
+# 使用仓库内固定快照，携带新版 Mihomo 响应兼容补丁；上游 revert 分支已不可用，
+# 不能改回 git 依赖，否则干净环境会因找不到分支而构建失败。
+tauri-plugin-mihomo = { path = "../vendor/tauri-plugin-mihomo" }
 clash_verge_logger = { git = "https://github.com/clash-verge-rev/clash-verge-logger" }
 async-trait = "0.1.89"
 clash_verge_service_ipc = { version = "2.2.0", features = [
