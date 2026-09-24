@@ -28,21 +28,22 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check if tag is from main branch
+      - name: 校验标签属于 main 或 dev 分支
+        shell: bash
         run: |
-          TAG_REF="${GITHUB_REF##*/}"
-          echo "Checking if tag $TAG_REF is from main branch..."
+          TAG_COMMIT=$(git rev-parse --verify "${GITHUB_REF}^{commit}")
 
-          TAG_COMMIT=$(git rev-list -n 1 $TAG_REF)
-          MAIN_COMMITS=$(git rev-list origin/main)
+          for branch in main dev; do
+            BRANCH_REF="refs/remotes/origin/$branch"
+            if git show-ref --verify --quiet "$BRANCH_REF" &&
+               git merge-base --is-ancestor "$TAG_COMMIT" "$BRANCH_REF"; then
+              echo "✅ 标签 $GITHUB_REF_NAME 的提交属于 $branch 分支"
+              exit 0
+            fi
+          done
 
-          if echo "$MAIN_COMMITS" | grep -q "$TAG_COMMIT"; then
-            echo "✅ Tag $TAG_REF is from main branch"
-          else
-            echo "❌ Tag $TAG_REF is not from main branch"
-            echo "This release workflow only accepts tags from main branch."
-            exit 1
-          fi
+          echo "❌ 标签 $GITHUB_REF_NAME 的提交不属于 main 或 dev 分支"
+          exit 1
 
       - name: Check tag and package.json version
         run: |
