@@ -401,22 +401,34 @@ pub fn run() {
                 event_handlers::handle_reopen(has_visible_windows).await;
             });
         }
-        tauri::RunEvent::Exit => AsyncHandler::block_on(async {
-            if !handle::Handle::global().is_exiting() {
-                feat::quit().await;
+        tauri::RunEvent::Exit => {
+            if !handle::Handle::global().is_exit_ready() {
+                // 事件循环已退出时仅作兜底清理，不能再次发送退出事件。
+                AsyncHandler::block_on(async {
+                    if !feat::clean_async().await {
+                        logging!(error, Type::System, "退出事件中的兜底网络清理失败");
+                    }
+                });
             }
-        }),
+        }
         tauri::RunEvent::ExitRequested { api, code, .. } => {
-            if core::handle::Handle::global().is_exiting() {
+            if handle::Handle::global().is_exit_ready() {
                 return;
             }
 
-            AsyncHandler::block_on(async {
-                let _ = handle::Handle::mihomo().await.clear_all_ws_connections().await;
-            });
+            if code == Some(tauri::RESTART_EXIT_CODE) {
+                // Tauri 的强制重启不能被 prevent_exit 拦截，只能同步等待清理。
+                AsyncHandler::block_on(async {
+                    let _ = feat::prepare_exit().await;
+                });
+                return;
+            }
 
-            if code.is_none() {
-                api.prevent_exit();
+            api.prevent_exit();
+            if let Some(code) = code {
+                AsyncHandler::spawn(move || async move {
+                    feat::quit_with_code(code).await;
+                });
             }
         }
         tauri::RunEvent::WindowEvent { label, event, .. } if label == "main" => match event {

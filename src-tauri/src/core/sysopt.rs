@@ -1,36 +1,28 @@
 use crate::{
     config::{Config, IVerge},
+    core::handle::Handle,
     singleton,
 };
 use anyhow::Result;
 use clash_verge_logging::{Type, logging};
 use parking_lot::RwLock;
-use scopeguard::defer;
 use smartstring::alias::String;
-use std::{
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
-    time::Duration,
-};
-use sysproxy::{Autoproxy, GuardMonitor, GuardType, Sysproxy};
-use tokio::sync::Mutex as TokioMutex;
+use std::{sync::Arc, time::Duration};
+use sysproxy::{Autoproxy, Sysproxy};
+use tokio::{sync::Mutex as TokioMutex, task::JoinHandle};
 
 pub struct Sysopt {
     update_lock: TokioMutex<()>,
-    reset_sysproxy: AtomicBool,
     inner_proxy: Arc<RwLock<(Sysproxy, Autoproxy)>>,
-    guard: Arc<RwLock<GuardMonitor>>,
+    guard: RwLock<Option<JoinHandle<()>>>,
 }
 
 impl Default for Sysopt {
     fn default() -> Self {
         Self {
             update_lock: TokioMutex::new(()),
-            reset_sysproxy: AtomicBool::new(false),
             inner_proxy: Arc::new(RwLock::new((Sysproxy::default(), Autoproxy::default()))),
-            guard: Arc::new(RwLock::new(GuardMonitor::new(GuardType::None, Duration::from_secs(30)))),
+            guard: RwLock::new(None),
         }
     }
 }
@@ -71,38 +63,54 @@ impl Sysopt {
         Self::default()
     }
 
-    fn access_guard(&self) -> Arc<RwLock<GuardMonitor>> {
-        Arc::clone(&self.guard)
+    fn stop_guard(&self) {
+        let task = self.guard.write().take();
+        if let Some(task) = task {
+            task.abort();
+        }
     }
 
     pub async fn refresh_guard(&self) {
-        logging!(info, Type::Core, "Refreshing system proxy guard...");
+        let _lock = self.update_lock.lock().await;
+        self.stop_guard();
+        if Handle::global().is_exiting() {
+            return;
+        }
         let verge = Config::verge().await.latest_arc();
-        if !verge.enable_system_proxy.unwrap_or_default() {
-            logging!(info, Type::Core, "System proxy is disabled.");
-            self.access_guard().write().stop();
+        if !verge.enable_system_proxy.unwrap_or_default() || !verge.enable_proxy_guard.unwrap_or_default() {
             return;
         }
-        if !verge.enable_proxy_guard.unwrap_or_default() {
-            logging!(info, Type::Core, "System proxy guard is disabled.");
+        let duration = Duration::from_secs(verge.proxy_guard_duration.unwrap_or(30).max(1));
+        logging!(info, Type::Core, "启动系统代理守护，间隔: {}秒", duration.as_secs());
+        *self.guard.write() = Some(tokio::spawn(async move {
+            let mut interval = tokio::time::interval(duration);
+            loop {
+                interval.tick().await;
+                Self::global().guard_proxy().await;
+            }
+        }));
+    }
+
+    async fn guard_proxy(&self) {
+        // 守护写入与关闭共用锁，关闭操作会等待已开始的守护写入完成。
+        let _lock = self.update_lock.lock().await;
+        if Handle::global().is_exiting() {
             return;
         }
-        logging!(
-            info,
-            Type::Core,
-            "Updating system proxy with duration: {} seconds",
-            verge.proxy_guard_duration.unwrap_or(30)
-        );
+        let (sys, auto) = &*self.inner_proxy.read();
+        if sys.enable
+            && let Ok(actual) = Sysproxy::get_system_proxy()
+            && actual != *sys
+            && let Err(e) = sys.set_system_proxy()
         {
-            let guard = self.access_guard();
-            guard
-                .write()
-                .set_interval(Duration::from_secs(verge.proxy_guard_duration.unwrap_or(30)));
+            logging!(warn, Type::Core, "恢复系统代理失败: {e}");
         }
-        logging!(info, Type::Core, "Starting system proxy guard...");
+        if auto.enable
+            && let Ok(actual) = Autoproxy::get_auto_proxy()
+            && actual != *auto
+            && let Err(e) = auto.set_auto_proxy()
         {
-            let guard = self.access_guard();
-            guard.write().start();
+            logging!(warn, Type::Core, "恢复PAC代理失败: {e}");
         }
     }
 
@@ -110,6 +118,9 @@ impl Sysopt {
     #[allow(clippy::unused_async)]
     pub async fn update_sysproxy(&self) -> Result<()> {
         let _lock = self.update_lock.lock().await;
+        if Handle::global().is_exiting() {
+            return Ok(());
+        }
 
         let verge = Config::verge().await.latest_arc();
         let port = match verge.verge_mixed_port {
@@ -117,11 +128,10 @@ impl Sysopt {
             None => Config::clash().await.latest_arc().get_mixed_port(),
         };
         let pac_port = IVerge::get_singleton_port();
-        let (sys_enable, pac_enable, proxy_host, proxy_guard) = (
+        let (sys_enable, pac_enable, proxy_host) = (
             verge.enable_system_proxy.unwrap_or_default(),
             verge.proxy_auto_config.unwrap_or_default(),
             verge.proxy_host.clone().unwrap_or_else(|| String::from("127.0.0.1")),
-            verge.enable_proxy_guard.unwrap_or_default(),
         );
         // 先 await, 避免持有锁导致的 Send 问题
         let bypass = get_bypass().await;
@@ -135,7 +145,9 @@ impl Sysopt {
         auto.enable = false;
         auto.url = format!("http://{proxy_host}:{pac_port}/commands/pac");
 
-        self.access_guard().write().set_guard_type(GuardType::None);
+        if !verge.enable_proxy_guard.unwrap_or_default() {
+            self.stop_guard();
+        }
 
         if !sys_enable && !pac_enable {
             // disable proxy
@@ -149,11 +161,6 @@ impl Sysopt {
             auto.enable = true;
             sys.set_system_proxy()?;
             auto.set_auto_proxy()?;
-            if proxy_guard {
-                self.access_guard()
-                    .write()
-                    .set_guard_type(GuardType::Autoproxy(auto.clone()));
-            }
             return Ok(());
         }
 
@@ -162,11 +169,6 @@ impl Sysopt {
             sys.enable = true;
             auto.set_auto_proxy()?;
             sys.set_system_proxy()?;
-            if proxy_guard {
-                self.access_guard()
-                    .write()
-                    .set_guard_type(GuardType::Sysproxy(sys.clone()));
-            }
             return Ok(());
         }
 
@@ -176,27 +178,40 @@ impl Sysopt {
     /// reset the sysproxy
     #[allow(clippy::unused_async)]
     pub async fn reset_sysproxy(&self) -> Result<()> {
-        if self
-            .reset_sysproxy
-            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-            .is_err()
-        {
-            return Ok(());
-        }
-        defer! {
-            self.reset_sysproxy.store(false, Ordering::SeqCst);
-        }
+        let _lock = self.update_lock.lock().await;
 
         // close proxy guard
-        self.access_guard().write().set_guard_type(GuardType::None);
+        self.stop_guard();
 
         // 直接关闭所有代理
         let (sys, auto) = &mut *self.inner_proxy.write();
         sys.enable = false;
-        sys.set_system_proxy()?;
         auto.enable = false;
-        auto.set_auto_proxy()?;
+        // 两种代理都要尝试关闭，不能因其中一种失败而跳过另一种。
+        let sys_result = sys.set_system_proxy();
+        let auto_result = auto.set_auto_proxy();
+        sys_result?;
+        auto_result?;
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Sysopt;
+
+    #[tokio::test]
+    async fn stopping_guard_cancels_a_pending_task() {
+        let sysopt = Sysopt::default();
+        let (sender, receiver) = tokio::sync::oneshot::channel::<()>();
+        *sysopt.guard.write() = Some(tokio::spawn(async move {
+            std::future::pending::<()>().await;
+            let _ = sender.send(());
+        }));
+        sysopt.stop_guard();
+        assert!(sysopt.guard.read().is_none());
+        assert!(receiver.await.is_err());
+        sysopt.stop_guard();
     }
 }

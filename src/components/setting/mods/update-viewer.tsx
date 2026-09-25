@@ -1,5 +1,4 @@
 import { Box, Button, LinearProgress } from '@mui/material'
-import { relaunch } from '@tauri-apps/plugin-process'
 import { open as openUrl } from '@tauri-apps/plugin-shell'
 import type { DownloadEvent } from '@tauri-apps/plugin-updater'
 import { useLockFn } from 'ahooks'
@@ -12,6 +11,7 @@ import rehypeRaw from 'rehype-raw'
 import { BaseDialog, DialogRef } from '@/components/base'
 import { useUpdate } from '@/hooks/use-update'
 import { portableFlag } from '@/pages/_layout'
+import { restartApp } from '@/services/cmds'
 import { showNotice } from '@/services/notice-service'
 import { useSetUpdateState, useUpdateState } from '@/services/states'
 
@@ -96,7 +96,7 @@ export function UpdateViewer({ ref }: { ref?: Ref<DialogRef> }) {
 
     try {
       await updateInfo.downloadAndInstall(onDownloadEvent)
-      await relaunch()
+      await restartApp()
     } catch (err: any) {
       showNotice.error(err)
     } finally {

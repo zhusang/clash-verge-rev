@@ -4,6 +4,7 @@ use crate::module::lightweight;
 use crate::utils;
 use crate::utils::window_manager::WindowManager;
 use clash_verge_logging::{Type, logging};
+use tauri_plugin_dialog::{DialogExt as _, MessageDialogKind};
 use tokio::time::{Duration, timeout};
 
 pub async fn open_or_close_dashboard() {
@@ -17,106 +18,49 @@ pub async fn open_or_close_dashboard() {
 }
 
 pub async fn quit() {
-    logging!(debug, Type::System, "启动退出流程");
-    // 设置退出标志
-    handle::Handle::global().set_is_exiting();
+    quit_with_code(0).await;
+}
 
-    utils::server::shutdown_embedded_server();
+pub async fn quit_with_code(code: i32) {
+    if prepare_exit().await {
+        handle::Handle::app_handle().exit(code);
+    }
+}
+
+pub async fn prepare_exit() -> bool {
+    let handle = handle::Handle::global();
+    if !handle.try_begin_exit() {
+        logging!(debug, Type::System, "退出流程已在进行，忽略重复请求");
+        return false;
+    }
+
+    logging!(info, Type::System, "退出前关闭系统代理和虚拟网卡");
+    if !clean_async().await {
+        handle.cancel_exit();
+        logging!(error, Type::System, "网络清理未完成，已取消退出，可重试");
+        handle::Handle::app_handle()
+            .dialog()
+            .message("未能完成系统代理或虚拟网卡的关闭，已取消退出。请检查日志后重试退出。")
+            .title("DinoVPN")
+            .kind(MessageDialogKind::Error)
+            .show(|_| {});
+        return false;
+    }
+
+    // 只清理运行状态，保留下次启动使用的开关偏好。
     Config::apply_all_and_save_file().await;
-
-    logging!(info, Type::System, "开始异步清理资源");
-    let cleanup_result = clean_async().await;
-
-    logging!(
-        info,
-        Type::System,
-        "资源清理完成，退出代码: {}",
-        if cleanup_result { 0 } else { 1 }
-    );
-
-    let app_handle = handle::Handle::app_handle();
-    app_handle.exit(if cleanup_result { 0 } else { 1 });
+    utils::server::shutdown_embedded_server();
+    handle.complete_exit_cleanup();
+    true
 }
 
 pub async fn clean_async() -> bool {
     logging!(info, Type::System, "开始执行异步清理操作...");
 
-    // 重置系统代理
-    let proxy_task = tokio::task::spawn(async {
-        let sys_proxy_enabled = Config::verge().await.data_arc().enable_system_proxy.unwrap_or(false);
-        if !sys_proxy_enabled {
-            logging!(info, Type::Window, "系统代理未启用，跳过重置");
-            return true;
-        }
-
-        logging!(info, Type::Window, "开始重置系统代理...");
-        match timeout(Duration::from_millis(1500), sysopt::Sysopt::global().reset_sysproxy()).await {
-            Ok(Ok(_)) => {
-                logging!(info, Type::Window, "系统代理已重置");
-                true
-            }
-            Ok(Err(e)) => {
-                logging!(warn, Type::Window, "Warning: 重置系统代理失败: {e}");
-                false
-            }
-            Err(_) => {
-                logging!(warn, Type::Window, "Warning: 重置系统代理超时，继续退出");
-                false
-            }
-        }
-    });
-
-    // 关闭 Tun 模式 + 停止核心服务
-    let core_task = tokio::task::spawn(async {
-        logging!(info, Type::System, "disable tun");
-        let tun_enabled = Config::verge().await.data_arc().enable_tun_mode.unwrap_or(false);
-        if tun_enabled {
-            let disable_tun = serde_json::json!({ "tun": { "enable": false } });
-
-            logging!(info, Type::System, "send disable tun request to mihomo");
-            match timeout(
-                Duration::from_millis(1000),
-                handle::Handle::mihomo().await.patch_base_config(&disable_tun),
-            )
-            .await
-            {
-                Ok(Ok(_)) => {
-                    logging!(info, Type::Window, "TUN模式已禁用");
-                }
-                Ok(Err(e)) => {
-                    logging!(warn, Type::Window, "Warning: 禁用TUN模式失败: {e}");
-                }
-                Err(_) => {
-                    logging!(
-                        warn,
-                        Type::Window,
-                        "Warning: 禁用TUN模式超时（可能系统正在关机），继续退出流程"
-                    );
-                }
-            }
-        }
-
-        #[cfg(target_os = "windows")]
-        let stop_timeout = Duration::from_secs(2);
-        #[cfg(not(target_os = "windows"))]
-        let stop_timeout = Duration::from_secs(3);
-
-        logging!(info, Type::System, "stop core");
-        match timeout(stop_timeout, CoreManager::global().stop_core()).await {
-            Ok(_) => {
-                logging!(info, Type::Window, "core已停止");
-                true
-            }
-            Err(_) => {
-                logging!(
-                    warn,
-                    Type::Window,
-                    "Warning: 停止core超时（可能系统正在关机），继续退出"
-                );
-                false
-            }
-        }
-    });
+    let network_task = tokio::task::spawn(clean_network(
+        sysopt::Sysopt::global().reset_sysproxy(),
+        CoreManager::global().shutdown_for_exit(),
+    ));
 
     // DNS恢复（仅macOS）
     let dns_task = tokio::task::spawn(async {
@@ -141,25 +85,51 @@ pub async fn clean_async() -> bool {
     });
 
     // 并行执行清理任务
-    let (proxy_result, core_result, dns_result) = tokio::join!(proxy_task, core_task, dns_task);
+    let (network_result, dns_result) = tokio::join!(network_task, dns_task);
 
-    let proxy_success = proxy_result.unwrap_or_default();
-    let core_success = core_result.unwrap_or_default();
+    let network_success = network_result.unwrap_or_default();
     let dns_success = dns_result.unwrap_or_default();
 
-    let all_success = proxy_success && core_success && dns_success;
+    let all_success = network_success && dns_success;
 
     logging!(
         info,
         Type::System,
-        "异步关闭操作完成 - 代理: {}, 核心: {}, DNS: {}, 总体: {}",
-        proxy_success,
-        core_success,
+        "异步关闭操作完成 - 网络: {}, DNS: {}, 总体: {}",
+        network_success,
         dns_success,
         all_success
     );
 
     all_success
+}
+
+async fn clean_network(
+    proxy: impl Future<Output = anyhow::Result<()>> + Send,
+    core: impl Future<Output = anyhow::Result<()>> + Send,
+) -> bool {
+    // 先关闭系统代理，避免核心停止后系统仍将流量发往已关闭的端口。
+    if !cleanup_step("系统代理", Duration::from_secs(5), proxy).await {
+        return false;
+    }
+    cleanup_step("TUN和核心", Duration::from_secs(10), core).await
+}
+
+async fn cleanup_step(name: &str, limit: Duration, operation: impl Future<Output = anyhow::Result<()>> + Send) -> bool {
+    match timeout(limit, operation).await {
+        Ok(Ok(())) => {
+            logging!(info, Type::System, "{name}已关闭");
+            true
+        }
+        Ok(Err(e)) => {
+            logging!(error, Type::System, "关闭{name}失败: {e}");
+            false
+        }
+        Err(_) => {
+            logging!(error, Type::System, "关闭{name}超时");
+            false
+        }
+    }
 }
 
 #[cfg(target_os = "macos")]
@@ -182,4 +152,51 @@ pub async fn hide() {
         let _ = window.hide();
     }
     handle::Handle::global().set_activation_policy_accessory();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{clean_network, cleanup_step};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use tokio::time::Duration;
+
+    #[tokio::test]
+    async fn cleanup_disables_proxy_before_stopping_core() {
+        let step = AtomicUsize::new(0);
+        let success = clean_network(
+            async {
+                assert_eq!(step.fetch_add(1, Ordering::SeqCst), 0);
+                Ok(())
+            },
+            async {
+                assert_eq!(step.fetch_add(1, Ordering::SeqCst), 1);
+                Ok(())
+            },
+        )
+        .await;
+        assert!(success);
+        assert_eq!(step.load(Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn proxy_failure_keeps_core_running() {
+        let calls = AtomicUsize::new(0);
+        let success = clean_network(async { Err(anyhow::anyhow!("代理关闭失败")) }, async {
+            calls.fetch_add(1, Ordering::SeqCst);
+            Ok(())
+        })
+        .await;
+        assert!(!success);
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn core_failure_is_not_reported_as_success() {
+        assert!(!clean_network(async { Ok(()) }, async { Err(anyhow::anyhow!("停止核心失败")) }).await);
+    }
+
+    #[tokio::test]
+    async fn cleanup_timeout_is_not_reported_as_success() {
+        assert!(!cleanup_step("测试", Duration::from_millis(1), std::future::pending()).await);
+    }
 }

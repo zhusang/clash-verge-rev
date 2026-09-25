@@ -10,12 +10,14 @@ use super::notification::{FrontendEvent, NotificationSystem};
 #[derive(Debug)]
 pub struct Handle {
     is_exiting: AtomicBool,
+    exit_ready: AtomicBool,
 }
 
 impl Default for Handle {
     fn default() -> Self {
         Self {
             is_exiting: AtomicBool::new(false),
+            exit_ready: AtomicBool::new(false),
         }
     }
 }
@@ -72,8 +74,23 @@ impl Handle {
         });
     }
 
-    pub fn set_is_exiting(&self) {
-        self.is_exiting.store(true, Ordering::Release);
+    pub fn try_begin_exit(&self) -> bool {
+        self.is_exiting
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+    }
+
+    pub fn cancel_exit(&self) {
+        self.exit_ready.store(false, Ordering::Release);
+        self.is_exiting.store(false, Ordering::Release);
+    }
+
+    pub fn complete_exit_cleanup(&self) {
+        self.exit_ready.store(true, Ordering::Release);
+    }
+
+    pub fn is_exit_ready(&self) -> bool {
+        self.exit_ready.load(Ordering::Acquire)
     }
 
     pub fn is_exiting(&self) -> bool {
@@ -104,5 +121,34 @@ impl Handle {
 
     pub fn set_activation_policy_accessory(&self) {
         let _ = self.set_activation_policy(tauri::ActivationPolicy::Accessory);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Handle;
+
+    #[test]
+    fn exit_waits_for_cleanup_and_rejects_duplicate_requests() {
+        let handle = Handle::default();
+        assert!(!handle.is_exiting());
+        assert!(!handle.is_exit_ready());
+        assert!(handle.try_begin_exit());
+        assert!(handle.is_exiting());
+        assert!(!handle.is_exit_ready());
+        assert!(!handle.try_begin_exit());
+        handle.complete_exit_cleanup();
+        assert!(handle.is_exit_ready());
+        assert!(!handle.try_begin_exit());
+    }
+
+    #[test]
+    fn failed_exit_can_be_retried() {
+        let handle = Handle::default();
+        assert!(handle.try_begin_exit());
+        handle.cancel_exit();
+        assert!(!handle.is_exiting());
+        assert!(!handle.is_exit_ready());
+        assert!(handle.try_begin_exit());
     }
 }

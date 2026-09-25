@@ -10,7 +10,6 @@ use anyhow::Result;
 use clash_verge_logging::Type;
 use compact_str::CompactString;
 use log::Level;
-use scopeguard::defer;
 use tauri_plugin_shell::ShellExt as _;
 
 impl CoreManager {
@@ -88,11 +87,8 @@ impl CoreManager {
         Ok(())
     }
 
-    pub(super) fn stop_core_by_sidecar(&self) {
+    pub(super) fn stop_core_by_sidecar(&self) -> Result<()> {
         logging!(info, Type::Core, "Stopping sidecar");
-        defer! {
-            self.set_running_mode(RunningMode::NotRunning);
-        }
         if let Some(child) = self.take_child_sidecar() {
             let pid = child.pid();
             let result = child.kill();
@@ -103,7 +99,10 @@ impl CoreManager {
                 pid,
                 result
             );
+            result?;
         }
+        self.set_running_mode(RunningMode::NotRunning);
+        Ok(())
     }
 
     pub(super) async fn start_core_by_service(&self) -> Result<()> {
@@ -116,10 +115,8 @@ impl CoreManager {
 
     pub(super) async fn stop_core_by_service(&self) -> Result<()> {
         logging!(info, Type::Core, "Stopping service");
-        defer! {
-            self.set_running_mode(RunningMode::NotRunning);
-        }
         service::stop_core_by_service().await?;
+        self.set_running_mode(RunningMode::NotRunning);
         Ok(())
     }
 }

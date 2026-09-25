@@ -1,9 +1,8 @@
 use crate::{
     config::Config,
     core::{CoreManager, handle, tray},
-    feat::clean_async,
+    feat::prepare_exit,
     process::AsyncHandler,
-    utils,
 };
 use clash_verge_logging::{Type, logging};
 use serde_yaml_ng::{Mapping, Value};
@@ -26,24 +25,9 @@ pub async fn restart_clash_core() {
 /// Restart the application
 pub async fn restart_app() {
     logging!(debug, Type::System, "启动重启应用流程");
-    // 设置退出标志
-    handle::Handle::global().set_is_exiting();
-
-    utils::server::shutdown_embedded_server();
-    Config::apply_all_and_save_file().await;
-
-    logging!(info, Type::System, "开始异步清理资源");
-    let cleanup_result = clean_async().await;
-
-    logging!(
-        info,
-        Type::System,
-        "资源清理完成，退出代码: {}",
-        if cleanup_result { 0 } else { 1 }
-    );
-
-    let app_handle = handle::Handle::app_handle();
-    app_handle.restart();
+    if prepare_exit().await {
+        handle::Handle::app_handle().request_restart();
+    }
 }
 
 fn after_change_clash_mode() {
