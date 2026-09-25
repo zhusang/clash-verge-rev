@@ -262,7 +262,7 @@ async fn initialize_config_files() -> Result<()> {
     if let Ok(path) = dirs::verge_path()
         && !path.exists()
     {
-        let template = IVerge::template();
+        let template = IVerge::first_run_template();
         help::save_yaml(&path, &template, Some("# DinoVPN"))
             .await
             .map_err(|e| anyhow::anyhow!("Failed to create verge config: {}", e))?;

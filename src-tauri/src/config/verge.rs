@@ -88,6 +88,10 @@ pub struct IVerge {
     /// can the app auto startup
     pub enable_auto_launch: Option<bool>,
 
+    /// 仅新建配置携带的一次性自启初始化标记，不通过设置补丁修改。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auto_launch_pending: Option<bool>,
+
     /// not show the window on launch
     pub enable_silent_start: Option<bool>,
 
@@ -385,6 +389,15 @@ impl IVerge {
         }
     }
 
+    /// 仅用于首次创建配置；已有配置读取失败时仍使用保守的恢复模板。
+    pub fn first_run_template() -> Self {
+        Self {
+            enable_auto_launch: Some(true),
+            auto_launch_pending: Some(true),
+            ..Self::template()
+        }
+    }
+
     pub fn template() -> Self {
         Self {
             app_log_max_size: Some(128),
@@ -503,6 +516,9 @@ impl IVerge {
 
         patch!(enable_tun_mode);
         patch!(enable_auto_launch);
+        if patch.enable_auto_launch.is_some() {
+            self.auto_launch_pending = None;
+        }
         patch!(enable_silent_start);
         patch!(enable_hover_jump_navigator);
         patch!(hover_jump_navigator_delay);
@@ -583,5 +599,63 @@ impl IVerge {
         } else {
             LevelFilter::Info
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::IVerge;
+
+    #[test]
+    fn first_run_enables_auto_launch_without_changing_silent_start() {
+        let config = IVerge::first_run_template();
+        assert_eq!(config.enable_auto_launch, Some(true));
+        assert_eq!(config.auto_launch_pending, Some(true));
+        assert_eq!(config.enable_silent_start, Some(false));
+    }
+
+    #[test]
+    fn recovery_template_does_not_enable_auto_launch() {
+        let config = IVerge::template();
+        assert_eq!(config.enable_auto_launch, Some(false));
+        assert_eq!(config.auto_launch_pending, None);
+    }
+
+    #[test]
+    fn existing_configs_never_acquire_first_run_marker() -> anyhow::Result<()> {
+        for yaml in ["{}", "enable_auto_launch: false", "enable_auto_launch: true"] {
+            let config: IVerge = serde_yaml_ng::from_str(yaml)?;
+            assert_eq!(config.auto_launch_pending, None);
+            let saved = serde_yaml_ng::to_string(&config)?;
+            let reloaded: IVerge = serde_yaml_ng::from_str(&saved)?;
+            assert_eq!(reloaded.enable_auto_launch, config.enable_auto_launch);
+            assert_eq!(reloaded.auto_launch_pending, None);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn first_run_marker_survives_config_round_trip() -> anyhow::Result<()> {
+        let saved = serde_yaml_ng::to_string(&IVerge::first_run_template())?;
+        let reloaded: IVerge = serde_yaml_ng::from_str(&saved)?;
+        assert_eq!(reloaded.auto_launch_pending, Some(true));
+        assert_eq!(reloaded.enable_auto_launch, Some(true));
+        Ok(())
+    }
+
+    #[test]
+    fn user_choice_cancels_first_run_default() -> anyhow::Result<()> {
+        for enabled in [false, true] {
+            let mut config = IVerge::first_run_template();
+            config.patch_config(&IVerge {
+                enable_auto_launch: Some(enabled),
+                ..IVerge::default()
+            });
+            let saved = serde_yaml_ng::to_string(&config)?;
+            let reloaded: IVerge = serde_yaml_ng::from_str(&saved)?;
+            assert_eq!(reloaded.enable_auto_launch, Some(enabled));
+            assert_eq!(reloaded.auto_launch_pending, None);
+        }
+        Ok(())
     }
 }

@@ -5,7 +5,7 @@ use anyhow::Result;
 use crate::{
     config::Config,
     core::{
-        CoreManager, Timer,
+        CoreManager, Timer, autostart,
         handle::Handle,
         hotkey::Hotkey,
         logger::Logger,
@@ -54,6 +54,7 @@ pub fn resolve_setup_async() {
         init_startup_script().await;
         init_verge_config().await;
         Config::verify_config_initialization().await;
+        logging_error!(Type::Setup, autostart::init_auto_launch().await);
         init_window().await;
 
         let core_init = AsyncHandler::spawn(|| async {
