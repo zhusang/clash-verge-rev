@@ -4,12 +4,21 @@ import {
   AdminPanelSettingsOutlined,
   DnsOutlined,
   ExtensionOutlined,
+  ShieldOutlined,
 } from '@mui/icons-material'
-import { Typography, Stack, Divider, Chip, IconButton } from '@mui/material'
+import {
+  Typography,
+  Stack,
+  Divider,
+  Chip,
+  IconButton,
+  Tooltip,
+} from '@mui/material'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
 
+import { useAdminRelaunch } from '@/hooks/use-admin-relaunch'
 import { useServiceInstaller } from '@/hooks/use-service-installer'
 import { useSystemState } from '@/hooks/use-system-state'
 import { useVerge } from '@/hooks/use-verge'
@@ -24,6 +33,7 @@ export const SystemInfoCard = () => {
   const navigate = useNavigate()
   const { isAdminMode, isSidecarMode } = useSystemState()
   const { installServiceAndRestartCore } = useServiceInstaller()
+  const { canRelaunchAsAdmin, onRelaunch } = useAdminRelaunch()
 
   const [osInfo, setOsInfo] = useState('')
 
@@ -211,15 +221,28 @@ export const SystemInfoCard = () => {
           <Typography variant="body2" color="text.secondary">
             {t('home.components.systemInfo.fields.runningMode')}
           </Typography>
-          <Typography
-            variant="body2"
-            fontWeight="medium"
-            onClick={handleRunningModeClick}
-            sx={runningModeStyle}
-          >
-            {getModeIcon()}
-            {getModeText()}
-          </Typography>
+          <Stack direction="row" spacing={0.5} alignItems="center">
+            <Typography
+              variant="body2"
+              fontWeight="medium"
+              onClick={handleRunningModeClick}
+              sx={runningModeStyle}
+            >
+              {getModeIcon()}
+              {getModeText()}
+            </Typography>
+            {/* 以管理员身份重启：仅 Windows 且当前非管理员时提供 */}
+            {canRelaunchAsAdmin && !isAdminMode && (
+              <Tooltip
+                arrow
+                title={t('home.components.systemInfo.actions.relaunchAsAdmin')}
+              >
+                <IconButton size="small" color="primary" onClick={onRelaunch}>
+                  <ShieldOutlined fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+          </Stack>
         </Stack>
         <Divider />
         <Stack direction="row" justifyContent="space-between">

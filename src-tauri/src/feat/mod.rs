@@ -1,3 +1,4 @@
+mod admin;
 mod backup;
 mod clash;
 mod config;
@@ -7,6 +8,7 @@ mod proxy;
 mod window;
 
 // Re-export all functions from modules
+pub use admin::*;
 pub use backup::*;
 pub use clash::*;
 pub use config::*;

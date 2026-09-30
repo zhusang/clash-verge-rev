@@ -77,6 +77,22 @@ pub async fn restart_app() -> CmdResult<()> {
     Ok(())
 }
 
+/// 以管理员身份重启应用（仅 Windows）。
+///
+/// 成功后当前进程会退出，由提权实例接管；用户取消 UAC 或提权失败时返回错误，
+/// 当前进程保持运行。
+#[tauri::command]
+pub async fn restart_as_admin() -> CmdResult<bool> {
+    match feat::restart_as_admin().await.stringify_err()? {
+        feat::AdminRestartOutcome::Relaunched => {
+            // 退出清理已完成，单例端口已释放，直接退出让提权实例接管。
+            crate::core::handle::Handle::app_handle().exit(0);
+        }
+        feat::AdminRestartOutcome::AlreadyElevated => {}
+    }
+    Ok(true)
+}
+
 /// 获取便携版标识
 #[tauri::command]
 pub fn get_portable_flag() -> bool {

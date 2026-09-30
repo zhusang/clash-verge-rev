@@ -15,11 +15,13 @@
         "systemProxy": "系統代理"
       },
       "tooltips": {
-        "silentStart": "程序啟動時以後台模式執行，不顯示程序面板"
+        "silentStart": "程序啟動時以後台模式執行，不顯示程序面板",
+        "adminRelaunch": "Restart as administrator to use TUN mode without installing the service"
       },
       "fields": {
         "autoLaunch": "開機自啟",
-        "silentStart": "靜默啟動"
+        "silentStart": "靜默啟動",
+        "adminRelaunch": "Restart as Administrator"
       },
       "notifications": {
         "tunMode": {
@@ -29,6 +31,12 @@
         "exclusive": {
           "systemProxyAutoDisabled": "已開啟虛擬網路介面卡模式，系統代理已自動停用",
           "tunModeAutoDisabled": "已開啟系統代理，虛擬網路介面卡模式已自動停用"
+        },
+        "adminRelaunch": {
+          "confirmTitle": "Restart as Administrator",
+          "confirmMessage": "DinoVPN will be closed and reopened with administrator privileges. Continue?",
+          "cancelled": "Administrator restart cancelled",
+          "alreadyAdmin": "Already running as administrator"
         }
       }
     },

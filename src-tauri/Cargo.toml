@@ -1,6 +1,6 @@
 [package]
 name = "clash-verge"
-version = "3.2.4"
+version = "3.2.5"
 description = "clash verge"
 authors = ["zzzgydi", "Tunglies", "wonfen", "MystiPanda"]
 license = "GPL-3.0-only"
@@ -118,9 +118,18 @@ dark-light = { git = "https://github.com/rust-dark-light/dark-light" }
 
 [target.'cfg(windows)'.dependencies]
 deelevate = { workspace = true }
+# `runas` 会 WaitForSingleObject(INFINITE) 等待子进程结束，只适合服务安装器等
+# 等待型子进程，不能用于启动 GUI 新实例；提权重启改用下方的 ShellExecuteExW。
 runas = "=1.2.0"
 winreg = "0.56.0"
 windows = { version = "0.62.2", features = ["Win32_Globalization"] }
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation",
+  # SHELLEXECUTEINFOW / ShellExecuteExW 受 Win32_System_Registry 门控
+  "Win32_System_Registry",
+  "Win32_UI_Shell",
+  "Win32_UI_WindowsAndMessaging",
+] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2.5.1"

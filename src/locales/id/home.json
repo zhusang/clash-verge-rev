@@ -67,7 +67,8 @@
         "vergeVersion": "Versi Verge"
       },
       "actions": {
-        "settings": "Pengaturan"
+        "settings": "Pengaturan",
+        "relaunchAsAdmin": "Restart as administrator"
       },
       "badges": {
         "adminMode": "Administrator Mode",

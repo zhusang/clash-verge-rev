@@ -67,7 +67,8 @@
         "vergeVersion": "Versión de Verge"
       },
       "actions": {
-        "settings": "Ajustes"
+        "settings": "Ajustes",
+        "relaunchAsAdmin": "Restart as administrator"
       },
       "badges": {
         "adminMode": "Modo de administrador",

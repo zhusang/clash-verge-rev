@@ -67,7 +67,8 @@
         "vergeVersion": "Verge Sürümü"
       },
       "actions": {
-        "settings": "Ayarlar"
+        "settings": "Ayarlar",
+        "relaunchAsAdmin": "Restart as administrator"
       },
       "badges": {
         "adminMode": "Yönetici Modu",

@@ -67,7 +67,8 @@
         "vergeVersion": "Версия DinoVPN"
       },
       "actions": {
-        "settings": "Настройки"
+        "settings": "Настройки",
+        "relaunchAsAdmin": "Restart as administrator"
       },
       "badges": {
         "adminMode": "Режим администратора",

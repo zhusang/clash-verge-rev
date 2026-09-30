@@ -1,5 +1,7 @@
 pub mod channel;
 pub mod dirs;
+#[cfg(target_os = "windows")]
+pub mod elevate;
 pub mod help;
 pub mod init;
 #[cfg(target_os = "linux")]

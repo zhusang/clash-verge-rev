@@ -67,7 +67,8 @@
         "vergeVersion": "Verge 版本"
       },
       "actions": {
-        "settings": "设置"
+        "settings": "设置",
+        "relaunchAsAdmin": "以管理员身份重启"
       },
       "badges": {
         "adminMode": "管理员模式",

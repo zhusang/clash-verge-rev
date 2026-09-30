@@ -15,11 +15,13 @@
         "systemProxy": "系统代理"
       },
       "tooltips": {
-        "silentStart": "程序启动时以后台模式运行，不显示程序面板"
+        "silentStart": "程序启动时以后台模式运行，不显示程序面板",
+        "adminRelaunch": "以管理员权限重启，无需安装服务即可使用虚拟网卡模式"
       },
       "fields": {
         "autoLaunch": "开机自启",
-        "silentStart": "静默启动"
+        "silentStart": "静默启动",
+        "adminRelaunch": "以管理员身份重启"
       },
       "notifications": {
         "tunMode": {
@@ -29,6 +31,12 @@
         "exclusive": {
           "systemProxyAutoDisabled": "已开启虚拟网卡模式，系统代理已自动关闭",
           "tunModeAutoDisabled": "已开启系统代理，虚拟网卡模式已自动关闭"
+        },
+        "adminRelaunch": {
+          "confirmTitle": "以管理员身份重启",
+          "confirmMessage": "将以管理员权限关闭并重新打开 DinoVPN，是否继续？",
+          "cancelled": "已取消管理员权限请求",
+          "alreadyAdmin": "当前已是管理员模式"
         }
       }
     },

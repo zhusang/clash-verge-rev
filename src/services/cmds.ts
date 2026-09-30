@@ -575,6 +575,16 @@ export const isAdmin = async () => {
   }
 }
 
+/**
+ * 以管理员身份重启应用（仅 Windows）。
+ *
+ * 成功时会由后端发起提权重启，当前进程随即退出，因此该 Promise 通常不会 resolve。
+ * 用户取消 UAC 或提权失败时会 reject，调用方据此提示用户。
+ */
+export const restartAsAdmin = async () => {
+  return invoke<boolean>('restart_as_admin')
+}
+
 export async function getNextUpdateTime(uid: string) {
   return invoke<number | null>('get_next_update_time', { uid })
 }

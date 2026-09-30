@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 
 import { DialogRef, Switch, TooltipIcon } from '@/components/base'
 import ProxyControlSwitches from '@/components/shared/proxy-control-switches'
+import { useAdminRelaunch } from '@/hooks/use-admin-relaunch'
 import { useVerge } from '@/hooks/use-verge'
 
 import { GuardState } from './mods/guard-state'
@@ -20,6 +21,8 @@ const SettingSystem = ({ onError }: Props) => {
   const { verge, mutateVerge, patchVerge } = useVerge()
 
   const { enable_auto_launch, enable_silent_start } = verge ?? {}
+
+  const { canRelaunchAsAdmin, isAdminMode, onRelaunch } = useAdminRelaunch()
 
   const sysproxyRef = useRef<DialogRef>(null)
   const tunRef = useRef<DialogRef>(null)
@@ -93,6 +96,27 @@ const SettingSystem = ({ onError }: Props) => {
           <Switch edge="end" />
         </GuardState>
       </SettingItem>
+
+      {/* 以管理员身份重启：仅 Windows 呈现（macOS 不支持 GUI 提权） */}
+      {canRelaunchAsAdmin && (
+        <SettingItem
+          label={t('settings.sections.system.fields.adminRelaunch')}
+          extra={
+            <TooltipIcon
+              title={t('settings.sections.system.tooltips.adminRelaunch')}
+              sx={{ opacity: '0.7' }}
+            />
+          }
+          secondary={
+            isAdminMode
+              ? t(
+                  'settings.sections.system.notifications.adminRelaunch.alreadyAdmin',
+                )
+              : undefined
+          }
+          onClick={isAdminMode ? undefined : onRelaunch}
+        />
+      )}
     </SettingList>
   )
 }

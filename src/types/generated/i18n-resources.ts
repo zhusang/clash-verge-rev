@@ -150,6 +150,7 @@ export interface TranslationResources {
         }
         systemInfo: {
           actions: {
+            relaunchAsAdmin: string
             settings: string
           }
           badges: {
@@ -1260,10 +1261,17 @@ export interface TranslationResources {
         }
         system: {
           fields: {
+            adminRelaunch: string
             autoLaunch: string
             silentStart: string
           }
           notifications: {
+            adminRelaunch: {
+              alreadyAdmin: string
+              cancelled: string
+              confirmMessage: string
+              confirmTitle: string
+            }
             exclusive: {
               systemProxyAutoDisabled: string
               tunModeAutoDisabled: string
@@ -1279,6 +1287,7 @@ export interface TranslationResources {
             tunMode: string
           }
           tooltips: {
+            adminRelaunch: string
             silentStart: string
           }
         }

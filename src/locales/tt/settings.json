@@ -15,11 +15,13 @@
         "systemProxy": "Системалы прокси"
       },
       "tooltips": {
-        "silentStart": "Программаны фоновый режимда, тәрәзәсез эшләтеп җибәрү"
+        "silentStart": "Программаны фоновый режимда, тәрәзәсез эшләтеп җибәрү",
+        "adminRelaunch": "Restart as administrator to use TUN mode without installing the service"
       },
       "fields": {
         "autoLaunch": "Автоматик башлау",
-        "silentStart": "Тын башлау"
+        "silentStart": "Тын башлау",
+        "adminRelaunch": "Restart as Administrator"
       },
       "notifications": {
         "tunMode": {
@@ -29,6 +31,12 @@
         "exclusive": {
           "systemProxyAutoDisabled": "System proxy was turned off because TUN mode is enabled",
           "tunModeAutoDisabled": "TUN mode was turned off because system proxy is enabled"
+        },
+        "adminRelaunch": {
+          "confirmTitle": "Restart as Administrator",
+          "confirmMessage": "DinoVPN will be closed and reopened with administrator privileges. Continue?",
+          "cancelled": "Administrator restart cancelled",
+          "alreadyAdmin": "Already running as administrator"
         }
       }
     },

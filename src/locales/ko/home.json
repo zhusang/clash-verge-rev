@@ -67,7 +67,8 @@
         "vergeVersion": "Verge 버전"
       },
       "actions": {
-        "settings": "설정"
+        "settings": "설정",
+        "relaunchAsAdmin": "Restart as administrator"
       },
       "badges": {
         "adminMode": "관리자 모드",

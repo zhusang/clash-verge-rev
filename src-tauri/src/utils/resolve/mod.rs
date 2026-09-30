@@ -55,6 +55,7 @@ pub fn resolve_setup_async() {
         init_verge_config().await;
         Config::verify_config_initialization().await;
         logging_error!(Type::Setup, autostart::init_auto_launch().await);
+        sync_autostart_level_after_elevation().await;
         init_window().await;
 
         let core_init = AsyncHandler::spawn(|| async {
@@ -196,3 +197,18 @@ pub fn resolve_done() {
 pub fn is_resolve_done() -> bool {
     RESOLVE_DONE.load(Ordering::Acquire)
 }
+
+/// 提权重启后，若用户开启了自启，把计划任务同步为管理员级别并移除用户级别任务，
+/// 避免每次开机再次弹出 UAC。复用 `autostart::update_launch()`（其内部依据当前
+/// 是否为管理员选择 TaskMode）。
+#[cfg(target_os = "windows")]
+async fn sync_autostart_level_after_elevation() {
+    if !crate::utils::elevate::is_elevated_launch() {
+        return;
+    }
+    logging!(info, Type::Setup, "检测到提权启动，同步开机自启任务级别");
+    logging_error!(Type::Setup, autostart::update_launch().await);
+}
+
+#[cfg(not(target_os = "windows"))]
+async fn sync_autostart_level_after_elevation() {}

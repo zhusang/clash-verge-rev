@@ -67,7 +67,8 @@
         "vergeVersion": "Verge версиясе"
       },
       "actions": {
-        "settings": "Көйләүләр"
+        "settings": "Көйләүләр",
+        "relaunchAsAdmin": "Restart as administrator"
       },
       "badges": {
         "adminMode": "Administrator Mode",
