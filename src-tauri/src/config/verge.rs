@@ -148,9 +148,10 @@ pub struct IVerge {
     pub home_cards: Option<serde_json::Value>,
 
     /// 首页风格
-    /// `traditional`（默认）| `minimal`
-    /// 纯前端渲染偏好，未知取值按 `traditional` 处理
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// `traditional` | `minimal`
+    /// 纯前端渲染偏好；新装用户由 `first_run_template` 默认写入 `minimal`，
+    /// 老配置缺省或未知取值按 `traditional` 处理。
+    /// 注意不能用 skip_serializing_if：切回传统风格后必须显式落盘。
     pub home_style: Option<String>,
 
     /// 简洁首页的连接方式
@@ -406,6 +407,8 @@ impl IVerge {
         Self {
             enable_auto_launch: Some(true),
             auto_launch_pending: Some(true),
+            // 新装用户默认简洁首页；老用户配置里无此字段，前端按 traditional 处理
+            home_style: Some("minimal".into()),
             ..Self::template()
         }
     }
@@ -671,6 +674,43 @@ mod tests {
             let reloaded: IVerge = serde_yaml_ng::from_str(&saved)?;
             assert_eq!(reloaded.enable_auto_launch, Some(enabled));
             assert_eq!(reloaded.auto_launch_pending, None);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn first_run_defaults_to_minimal_home_style() {
+        let config = IVerge::first_run_template();
+        assert_eq!(config.home_style.as_deref(), Some("minimal"));
+        // 恢复模板保持 None：老配置/恢复场景不会被强切成简洁风格
+        assert_eq!(IVerge::template().home_style, None);
+    }
+
+    #[test]
+    fn existing_configs_never_acquire_home_style() -> anyhow::Result<()> {
+        // 老配置缺省 home_style 字段，序列化往返后仍应保持 None（前端按 traditional 处理）
+        for yaml in ["{}", "enable_auto_launch: false"] {
+            let config: IVerge = serde_yaml_ng::from_str(yaml)?;
+            assert_eq!(config.home_style, None);
+            let saved = serde_yaml_ng::to_string(&config)?;
+            let reloaded: IVerge = serde_yaml_ng::from_str(&saved)?;
+            assert_eq!(reloaded.home_style, None);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn home_style_survives_config_round_trip() -> anyhow::Result<()> {
+        // 新装默认值与用户的显式选择都必须持久化
+        for style in ["minimal", "traditional"] {
+            let mut config = IVerge::first_run_template();
+            config.patch_config(&IVerge {
+                home_style: Some(style.into()),
+                ..IVerge::default()
+            });
+            let saved = serde_yaml_ng::to_string(&config)?;
+            let reloaded: IVerge = serde_yaml_ng::from_str(&saved)?;
+            assert_eq!(reloaded.home_style.as_deref(), Some(style));
         }
         Ok(())
     }
