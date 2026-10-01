@@ -147,6 +147,18 @@ pub struct IVerge {
     /// 控制首页各个卡片的显示和隐藏
     pub home_cards: Option<serde_json::Value>,
 
+    /// 首页风格
+    /// `traditional`（默认）| `minimal`
+    /// 纯前端渲染偏好，未知取值按 `traditional` 处理
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub home_style: Option<String>,
+
+    /// 简洁首页的连接方式
+    /// `tun`（默认）| `system_proxy`
+    /// 决定简洁首页大圆钮开关的是虚拟网卡还是系统代理，未知取值按 `tun` 处理
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub home_connection_mode: Option<String>,
+
     /// 切换代理时自动关闭连接
     pub auto_close_connection: Option<bool>,
 
@@ -466,6 +478,8 @@ impl IVerge {
             auto_light_weight_minutes: Some(10),
             enable_dns_settings: Some(false),
             home_cards: None,
+            home_style: None,
+            home_connection_mode: None,
             enable_external_controller: Some(false),
             enable_traffic_usage: Some(true),
             traffic_usage_retention_days: Some(30),
@@ -575,6 +589,8 @@ impl IVerge {
         patch!(auto_light_weight_minutes);
         patch!(enable_dns_settings);
         patch!(home_cards);
+        patch!(home_style);
+        patch!(home_connection_mode);
         patch!(enable_external_controller);
         patch!(enable_traffic_usage);
         patch!(traffic_usage_retention_days);

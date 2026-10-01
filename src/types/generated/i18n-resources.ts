@@ -187,6 +187,40 @@ export interface TranslationResources {
           }
         }
       }
+      minimal: {
+        connection: {
+          busy: string
+          disable: string
+          disabled: string
+          enable: string
+          enabled: string
+          installService: string
+          label: string
+          systemProxy: string
+          unavailable: string
+          unavailableHint: string
+          virtualNic: string
+        }
+        menu: {
+          openMenu: string
+          switchToMinimal: string
+          switchToTraditional: string
+        }
+        mode: {
+          label: string
+        }
+        node: {
+          dialogTitle: string
+          empty: string
+          label: string
+          none: string
+          switch: string
+          testAll: string
+          testing: string
+          untested: string
+        }
+        title: string
+      }
       page: {
         cards: {
           networkSettings: string
@@ -213,6 +247,10 @@ export interface TranslationResources {
             traffic: string
           }
           title: string
+        }
+        style: {
+          minimal: string
+          traditional: string
         }
         title: string
         tooltips: {

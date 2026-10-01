@@ -24,6 +24,10 @@
       },
       "title": "首页设置"
     },
+    "style": {
+      "minimal": "简洁风格",
+      "traditional": "传统风格"
+    },
     "quickFix": {
       "button": "一键修复",
       "tooltipNoProfile": "请先选择订阅",
@@ -32,6 +36,40 @@
       "restartFailed": "内核重启失败"
     },
     "title": "首页"
+  },
+  "minimal": {
+    "menu": {
+      "openMenu": "菜单",
+      "switchToTraditional": "切换到传统风格",
+      "switchToMinimal": "切换到简洁风格"
+    },
+    "title": "DinoVPN",
+    "mode": {
+      "label": "代理模式"
+    },
+    "connection": {
+      "label": "连接方式",
+      "systemProxy": "系统代理",
+      "virtualNic": "虚拟网卡",
+      "enable": "开启{{mode}}",
+      "disable": "关闭{{mode}}",
+      "enabled": "已开启",
+      "disabled": "已关闭",
+      "busy": "正在切换...",
+      "unavailable": "不可用",
+      "unavailableHint": "虚拟网卡模式不可用，需要服务模式或管理员模式",
+      "installService": "安装服务"
+    },
+    "node": {
+      "label": "当前节点",
+      "none": "未选择节点",
+      "switch": "切换节点",
+      "dialogTitle": "选择节点",
+      "testing": "测速中",
+      "untested": "未测试",
+      "testAll": "测试全部延迟",
+      "empty": "暂无可选择的节点"
+    }
   },
   "components": {
     "proxyTun": {

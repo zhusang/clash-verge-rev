@@ -24,6 +24,10 @@
       },
       "title": "Home Settings"
     },
+    "style": {
+      "minimal": "Minimal",
+      "traditional": "Traditional"
+    },
     "quickFix": {
       "button": "Quick Fix",
       "tooltipNoProfile": "Please select a profile first",
@@ -32,6 +36,40 @@
       "restartFailed": "Failed to restart core"
     },
     "title": "Home"
+  },
+  "minimal": {
+    "menu": {
+      "openMenu": "Menu",
+      "switchToTraditional": "Switch to traditional style",
+      "switchToMinimal": "Switch to minimal style"
+    },
+    "title": "DinoVPN",
+    "mode": {
+      "label": "Proxy Mode"
+    },
+    "connection": {
+      "label": "Connection Mode",
+      "systemProxy": "System Proxy",
+      "virtualNic": "Virtual NIC",
+      "enable": "Enable {{mode}}",
+      "disable": "Disable {{mode}}",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "busy": "Switching...",
+      "unavailable": "Unavailable",
+      "unavailableHint": "Virtual NIC mode requires Service Mode or Admin Mode",
+      "installService": "Install Service"
+    },
+    "node": {
+      "label": "Current Node",
+      "none": "No node selected",
+      "switch": "Switch Node",
+      "dialogTitle": "Select Node",
+      "testing": "Testing",
+      "untested": "Untested",
+      "testAll": "Test All",
+      "empty": "No selectable nodes"
+    }
   },
   "components": {
     "proxyTun": {

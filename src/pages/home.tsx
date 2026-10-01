@@ -33,6 +33,8 @@ import { CurrentProxyCard } from '@/components/home/current-proxy-card'
 import { EnhancedCard } from '@/components/home/enhanced-card'
 import { EnhancedTrafficStats } from '@/components/home/enhanced-traffic-stats'
 import { HomeProfileCard } from '@/components/home/home-profile-card'
+import { HomeStyleMenu } from '@/components/home/home-style-menu'
+import { MinimalHome } from '@/components/home/minimal-home-page'
 import { ProxyTunCard } from '@/components/home/proxy-tun-card'
 import { useProfiles } from '@/hooks/use-profiles'
 import { useVerge } from '@/hooks/use-verge'
@@ -217,18 +219,102 @@ const HomeSettingsDialog = ({
   )
 }
 
+interface WelcomeDialogProps {
+  open: boolean
+  onDismiss: () => void
+}
+
+/**
+ * 首次启动的订阅导入弹窗。
+ * 由调度层在两种首页风格下都渲染，保证简洁风格下首次启动仍可导入订阅。
+ */
+const WelcomeDialog = ({ open, onDismiss }: WelcomeDialogProps) => {
+  const { mutateProfiles } = useProfiles()
+  const [subUrl, setSubUrl] = useState('')
+  const [importing, setImporting] = useState(false)
+  const [importError, setImportError] = useState('')
+
+  const handleImportSub = useCallback(async () => {
+    const url = subUrl.trim()
+    if (!url) return
+    setImporting(true)
+    setImportError('')
+    try {
+      // 1. 导入订阅并拿到新订阅的 UID
+      const newUid = await importProfile(url)
+
+      // 2. 显式激活新订阅
+      if (newUid) {
+        await patchProfilesConfig({ current: newUid })
+      }
+
+      // 3. 刷新界面
+      await mutateProfiles()
+
+      // 4. 重载内核
+      await new Promise((r) => setTimeout(r, 300))
+      await enhanceProfiles()
+
+      onDismiss()
+    } catch (e: any) {
+      setImportError(String(e?.message || e || '导入失败'))
+    } finally {
+      setImporting(false)
+    }
+  }, [subUrl, mutateProfiles, onDismiss])
+
+  return (
+    <Dialog open={open} maxWidth="sm" fullWidth disableEscapeKeyDown>
+      <DialogTitle sx={{ fontWeight: 700, fontSize: 22 }}>
+        🎉 欢迎使用Dino-VPN
+      </DialogTitle>
+      <DialogContent>
+        <Typography sx={{ mb: 2, color: 'text.secondary' }}>
+          检测到您是首次启动，请粘贴您的订阅链接以便快速开始：
+        </Typography>
+        <TextField
+          autoFocus
+          fullWidth
+          variant="outlined"
+          placeholder="https://example.com/subscribe?token=xxx"
+          value={subUrl}
+          onChange={(e) => setSubUrl(e.target.value)}
+          disabled={importing}
+          error={!!importError}
+          helperText={importError || ''}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && subUrl.trim()) {
+              handleImportSub()
+            }
+          }}
+        />
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
+        <Button onClick={onDismiss} disabled={importing}>
+          稍后手动添加
+        </Button>
+        <Button
+          variant="contained"
+          onClick={handleImportSub}
+          disabled={importing || !subUrl.trim()}
+          startIcon={importing ? <CircularProgress size={16} /> : null}
+        >
+          {importing ? '正在导入...' : '确认导入'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
 const HomePage = () => {
   const navigate = useNavigate()
   const { t } = useTranslation()
-  const { verge } = useVerge()
+  const { verge, patchVerge } = useVerge()
   const { profiles, current, mutateProfiles } = useProfiles()
 
   // Welcome dialog state — derive `welcomeOpen` from profiles + dismissed flag
   // to avoid `setState` calls inside `useEffect` (eslint set-state-in-effect)
   const [welcomeDismissed, setWelcomeDismissed] = useState(false)
-  const [subUrl, setSubUrl] = useState('')
-  const [importing, setImporting] = useState(false)
-  const [importError, setImportError] = useState('')
 
   const welcomeOpen = useMemo(() => {
     if (welcomeDismissed) return false
@@ -264,35 +350,6 @@ const HomePage = () => {
       setQuickFixLoading(false)
     }
   }, [profiles])
-
-  const handleImportSub = useCallback(async () => {
-    const url = subUrl.trim()
-    if (!url) return
-    setImporting(true)
-    setImportError('')
-    try {
-      // 1. import the subscription and get the new profile's UID (requires backend update)
-      const newUid = await importProfile(url)
-
-      // 2. explicitly activate the new profile
-      if (newUid) {
-        await patchProfilesConfig({ current: newUid })
-      }
-
-      // 3. refresh UI
-      await mutateProfiles()
-
-      // 4. reload core engine
-      await new Promise((r) => setTimeout(r, 300))
-      await enhanceProfiles()
-
-      setWelcomeDismissed(true)
-    } catch (e: any) {
-      setImportError(String(e?.message || e || '导入失败'))
-    } finally {
-      setImporting(false)
-    }
-  }, [subUrl, mutateProfiles])
 
   // 设置弹窗的状态
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -438,12 +495,53 @@ const HomePage = () => {
     () => `${serializeCardFlags(effectiveHomeCards)}:${settingsOpen ? 1 : 0}`,
     [effectiveHomeCards, settingsOpen],
   )
+
+  // ---- 风格切换 -------------------------------------------------------------
+  const isMinimal = verge?.home_style === 'minimal'
+
+  const handleSwitchToTraditional = useCallback(() => {
+    void patchVerge({ home_style: 'traditional' })
+  }, [patchVerge])
+
+  // 首次启动订阅导入弹窗：两种风格下都可用
+  const welcomeDialog = (
+    <WelcomeDialog
+      open={welcomeOpen}
+      onDismiss={() => setWelcomeDismissed(true)}
+    />
+  )
+
+  // 首页卡片设置弹窗：两种风格下都可用
+  const homeSettingsDialog = (
+    <HomeSettingsDialog
+      key={dialogKey}
+      open={settingsOpen}
+      onClose={() => setSettingsOpen(false)}
+      homeCards={effectiveHomeCards}
+      onSave={handleSaveSettings}
+    />
+  )
+
+  if (isMinimal) {
+    return (
+      <Box sx={{ width: '100%', height: '100%' }}>
+        <MinimalHome
+          onSwitchToTraditional={handleSwitchToTraditional}
+          onOpenSettings={openSettings}
+        />
+        {homeSettingsDialog}
+        {welcomeDialog}
+      </Box>
+    )
+  }
+
   return (
     <BasePage
       title={t('home.page.title')}
       contentStyle={{ padding: 2 }}
       header={
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <HomeStyleMenu />
           <Tooltip
             title={
               !profiles?.current ? t('home.page.quickFix.tooltipNoProfile') : ''
@@ -513,57 +611,10 @@ const HomePage = () => {
       </Grid>
 
       {/* 首页设置弹窗 */}
-      <HomeSettingsDialog
-        key={dialogKey}
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        homeCards={effectiveHomeCards}
-        onSave={handleSaveSettings}
-      />
+      {homeSettingsDialog}
 
       {/* 首次启动欢迎弹窗 */}
-      <Dialog open={welcomeOpen} maxWidth="sm" fullWidth disableEscapeKeyDown>
-        <DialogTitle sx={{ fontWeight: 700, fontSize: 22 }}>
-          🎉 欢迎使用Dino-VPN
-        </DialogTitle>
-        <DialogContent>
-          <Typography sx={{ mb: 2, color: 'text.secondary' }}>
-            检测到您是首次启动，请粘贴您的订阅链接以便快速开始：
-          </Typography>
-          <TextField
-            autoFocus
-            fullWidth
-            variant="outlined"
-            placeholder="https://example.com/subscribe?token=xxx"
-            value={subUrl}
-            onChange={(e) => setSubUrl(e.target.value)}
-            disabled={importing}
-            error={!!importError}
-            helperText={importError || ''}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && subUrl.trim()) {
-                handleImportSub()
-              }
-            }}
-          />
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button
-            onClick={() => setWelcomeDismissed(true)}
-            disabled={importing}
-          >
-            稍后手动添加
-          </Button>
-          <Button
-            variant="contained"
-            onClick={handleImportSub}
-            disabled={importing || !subUrl.trim()}
-            startIcon={importing ? <CircularProgress size={16} /> : null}
-          >
-            {importing ? '正在导入...' : '确认导入'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {welcomeDialog}
     </BasePage>
   )
 }

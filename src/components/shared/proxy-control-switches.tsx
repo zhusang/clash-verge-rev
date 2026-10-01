@@ -8,7 +8,7 @@ import {
 } from '@mui/icons-material'
 import { Box, Typography, alpha, useTheme } from '@mui/material'
 import { useLockFn } from 'ahooks'
-import React, { useCallback, useRef, useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { DialogRef, Switch, TooltipIcon } from '@/components/base'
@@ -18,6 +18,7 @@ import { useServiceInstaller } from '@/hooks/use-service-installer'
 import { useServiceUninstaller } from '@/hooks/use-service-uninstaller'
 import { useSystemProxyState } from '@/hooks/use-system-proxy-state'
 import { useSystemState } from '@/hooks/use-system-state'
+import { useTunModeToggle } from '@/hooks/use-tun-mode-toggle'
 import { useVerge } from '@/hooks/use-verge'
 import { showNotice } from '@/services/notice-service'
 
@@ -130,7 +131,7 @@ const ProxyControlSwitches = ({
   noRightPadding = false,
 }: ProxySwitchProps) => {
   const { t } = useTranslation()
-  const { verge, mutateVerge, patchVerge } = useVerge()
+  const { verge } = useVerge()
   const { installServiceAndRestartCore } = useServiceInstaller()
   const { uninstallServiceAndRestartCore } = useServiceUninstaller()
   const { indicator: systemProxyIndicator, toggleSystemProxy } =
@@ -143,29 +144,8 @@ const ProxyControlSwitches = ({
 
   const { enable_tun_mode } = verge ?? {}
 
-  const showErrorNotice = useCallback(
-    (msg: string) => showNotice.error(msg),
-    [],
-  )
-
-  const handleTunToggle = async (value: boolean) => {
-    if (!isTunModeAvailable) {
-      const msgKey = 'settings.sections.proxyControl.tooltips.tunUnavailable'
-      showErrorNotice(msgKey)
-      throw new Error(t(msgKey))
-    }
-    mutateVerge(
-      {
-        ...verge,
-        enable_tun_mode: value,
-        // System proxy and TUN mode are mutually exclusive. The backend turns
-        // system proxy off; mirror it here so the other switch reacts at once.
-        ...(value ? { enable_system_proxy: false } : {}),
-      },
-      false,
-    )
-    await patchVerge({ enable_tun_mode: value })
-  }
+  // TUN 开关逻辑与简洁首页共用同一份实现
+  const { tunToggle } = useTunModeToggle()
 
   const onInstallService = useLockFn(async () => {
     try {
@@ -179,7 +159,7 @@ const ProxyControlSwitches = ({
   const onUninstallService = useLockFn(async () => {
     try {
       if (verge?.enable_tun_mode) {
-        await handleTunToggle(false)
+        await tunToggle(false)
       }
       await uninstallServiceAndRestartCore()
       await mutateSystemState()
@@ -212,7 +192,7 @@ const ProxyControlSwitches = ({
           active={enable_tun_mode || false}
           infoTitle={t('settings.sections.proxyControl.tooltips.tunMode')}
           onInfoClick={() => tunRef.current?.open()}
-          onToggle={handleTunToggle}
+          onToggle={tunToggle}
           onError={onError}
           disabled={!isTunModeAvailable}
           highlight={enable_tun_mode || false}
