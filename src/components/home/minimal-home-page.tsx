@@ -197,8 +197,27 @@ export const MinimalHome = ({
     delayManager.setListener(activeProxyName, activeGroupName, (next) =>
       setActiveDelay(next.delay),
     )
+
+    // provider 节点的 getDelayFix 读的是内核 history（上次订阅自动健康检查的陈旧
+    // 结果），缓存里又没有实时测试记录时会一直显示陈旧的 Timeout。
+    // 此时主动测一次当前节点，结果经上面的 listener 刷新，与节点弹窗/代理页一致。
+    if (
+      delayManager.getDelayUpdate(activeProxyName, activeGroupName) ===
+      undefined
+    ) {
+      const timeout = verge?.default_latency_timeout || 10000
+      delayManager
+        .checkDelay(activeProxyName, activeGroupName, timeout)
+        .catch(() => {})
+    }
+
     return () => delayManager.removeListener(activeProxyName, activeGroupName)
-  }, [activeProxy, activeGroupName, activeProxyName])
+  }, [
+    activeProxy,
+    activeGroupName,
+    activeProxyName,
+    verge?.default_latency_timeout,
+  ])
 
   const delayText =
     activeProxy && activeProxyName
