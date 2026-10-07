@@ -219,6 +219,12 @@ export interface TranslationResources {
           testing: string
           untested: string
         }
+        subscription: {
+          label: string
+          longTerm: string
+          remaining: string
+          unlimited: string
+        }
         title: string
       }
       page: {

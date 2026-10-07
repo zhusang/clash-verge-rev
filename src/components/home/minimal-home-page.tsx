@@ -21,12 +21,20 @@ import {
   useTheme,
 } from '@mui/material'
 import { useLockFn } from 'ahooks'
-import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
 import { closeAllConnections } from 'tauri-plugin-mihomo-api'
 
 import { MinimalNodeDialog } from '@/components/home/minimal-node-dialog'
+import { MinimalSubscriptionBar } from '@/components/home/minimal-subscription-bar'
 import { useServiceInstaller } from '@/hooks/use-service-installer'
 import { useSystemProxyState } from '@/hooks/use-system-proxy-state'
 import { useSystemState } from '@/hooks/use-system-state'
@@ -44,6 +52,12 @@ interface Props {
 }
 
 const BIG_BUTTON_SIZE = 220
+
+/** 未配置自定义测试地址时使用的默认延迟测试 URL，与节点弹窗保持一致 */
+const DEFAULT_LATENCY_TEST_URL = 'http://cp.cloudflare.com/generate_204'
+
+/** 后台自动检测的默认间隔（分钟），与传统首页 CurrentProxyCard 一致 */
+const AUTO_CHECK_DEFAULT_INTERVAL_MINUTES = 5
 
 type ClashModeKey = 'rule' | 'global' | 'direct'
 
@@ -170,6 +184,7 @@ export const MinimalHome = ({
 
   const activeProxyName = activeGroup?.now || ''
 
+  // 延迟与节点信息取自 records（与 `CurrentProxyCard` 保持一致）
   const activeProxy = useMemo(
     () => (activeProxyName ? proxies?.records?.[activeProxyName] : undefined),
     [proxies, activeProxyName],
@@ -182,6 +197,44 @@ export const MinimalHome = ({
     -1,
   )
 
+  // 立即检测去重：同一「组::节点」只自动测一次，避免 proxies 数据刷新导致
+  // 反复重测（节点不通时结果为 0，若不 guard 会随每次刷新再次触发）。
+  const autoCheckedRef = useRef<string | null>(null)
+
+  // 自动延迟检测：复用设置页的开关与间隔（默认关闭，间隔 5 分钟），
+  // 与传统首页 CurrentProxyCard 保持同一份配置语义。
+  const autoDelayEnabled = verge?.enable_auto_delay_detection ?? false
+  const autoDelayIntervalMs = useMemo(() => {
+    const rawInterval = verge?.auto_delay_detection_interval_minutes
+    const intervalMinutes =
+      typeof rawInterval === 'number' && rawInterval > 0
+        ? rawInterval
+        : AUTO_CHECK_DEFAULT_INTERVAL_MINUTES
+    return Math.max(1, Math.round(intervalMinutes)) * 60 * 1000
+  }, [verge?.auto_delay_detection_interval_minutes])
+
+  // 统一的当前节点延迟检测入口。
+  // 测试地址必须在检测前写入：checkDelay 经 getUrl 读取按组记录的 URL，未设置
+  // 时会回退到内置地址；若该地址不可达，结果会被记为 0 并显示为 Timeout。
+  // 节点弹窗同样是先 setUrl 再测，这里与其保持一致。
+  const runDelayCheck = useCallback(() => {
+    if (!activeProxyName || !activeGroupName) return
+    delayManager.setUrl(
+      activeGroupName,
+      verge?.default_latency_test?.trim() || DEFAULT_LATENCY_TEST_URL,
+    )
+    const timeout = verge?.default_latency_timeout || 10000
+    delayManager
+      .checkDelay(activeProxyName, activeGroupName, timeout)
+      .catch(() => {})
+  }, [
+    activeGroupName,
+    activeProxyName,
+    verge?.default_latency_test,
+    verge?.default_latency_timeout,
+  ])
+
+  // 订阅当前节点的延迟结果
   useEffect(() => {
     if (!activeProxyName || !activeGroupName) {
       setActiveDelay(-1)
@@ -198,25 +251,55 @@ export const MinimalHome = ({
       setActiveDelay(next.delay),
     )
 
-    // provider 节点的 getDelayFix 读的是内核 history（上次订阅自动健康检查的陈旧
-    // 结果），缓存里又没有实时测试记录时会一直显示陈旧的 Timeout。
-    // 此时主动测一次当前节点，结果经上面的 listener 刷新，与节点弹窗/代理页一致。
+    return () => delayManager.removeListener(activeProxyName, activeGroupName)
+  }, [activeProxy, activeGroupName, activeProxyName])
+
+  // 进入首页或切换节点时补测一次：无缓存覆盖首屏从未测过的情况，
+  // 缓存为 0 则让订阅遗留的陈旧超时能自动恢复。
+  useEffect(() => {
+    if (!activeProxyName || !activeGroupName) return
+
+    const testKey = `${activeGroupName}::${activeProxyName}`
+    const cachedDelay = delayManager.getDelayUpdate(
+      activeProxyName,
+      activeGroupName,
+    )?.delay
+
     if (
-      delayManager.getDelayUpdate(activeProxyName, activeGroupName) ===
-      undefined
+      (cachedDelay === undefined || cachedDelay === 0) &&
+      autoCheckedRef.current !== testKey
     ) {
-      const timeout = verge?.default_latency_timeout || 10000
-      delayManager
-        .checkDelay(activeProxyName, activeGroupName, timeout)
-        .catch(() => {})
+      autoCheckedRef.current = testKey
+      runDelayCheck()
+    }
+  }, [activeGroupName, activeProxyName, runDelayCheck])
+
+  // 可选的后台定时检测，与设置页开关联动（默认关闭）
+  useEffect(() => {
+    if (!autoDelayEnabled) return
+    if (!activeGroupName || !activeProxyName) return
+
+    let disposed = false
+    let intervalTimer: ReturnType<typeof setTimeout> | null = null
+
+    const runAndSchedule = () => {
+      if (disposed) return
+      runDelayCheck()
+      intervalTimer = setTimeout(runAndSchedule, autoDelayIntervalMs)
     }
 
-    return () => delayManager.removeListener(activeProxyName, activeGroupName)
+    intervalTimer = setTimeout(runAndSchedule, autoDelayIntervalMs)
+
+    return () => {
+      disposed = true
+      if (intervalTimer) clearTimeout(intervalTimer)
+    }
   }, [
-    activeProxy,
+    autoDelayEnabled,
+    autoDelayIntervalMs,
     activeGroupName,
     activeProxyName,
-    verge?.default_latency_timeout,
+    runDelayCheck,
   ])
 
   const delayText =
@@ -374,6 +457,9 @@ export const MinimalHome = ({
           />
         </Tooltip>
       </Box>
+
+      {/* 当前订阅信息（名称 / 剩余流量 / 到期时间），只读 */}
+      <MinimalSubscriptionBar />
 
       {/* 中央：大圆钮 */}
       <Box

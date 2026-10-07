@@ -69,6 +69,12 @@
       "untested": "Untested",
       "testAll": "Test All",
       "empty": "No selectable nodes"
+    },
+    "subscription": {
+      "label": "Subscription Info",
+      "remaining": "Remaining",
+      "unlimited": "Unlimited",
+      "longTerm": "Lifetime"
     }
   },
   "components": {

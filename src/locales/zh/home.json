@@ -69,6 +69,12 @@
       "untested": "未测试",
       "testAll": "测试全部延迟",
       "empty": "暂无可选择的节点"
+    },
+    "subscription": {
+      "label": "订阅信息",
+      "remaining": "剩余",
+      "unlimited": "流量不限",
+      "longTerm": "长期有效"
     }
   },
   "components": {
