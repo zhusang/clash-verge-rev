@@ -21,13 +21,16 @@ import {
 import { useLockFn } from 'ahooks'
 import { useCallback, useEffect, useMemo, useReducer, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { delayGroup, healthcheckProxyProvider } from 'tauri-plugin-mihomo-api'
 
 import { VirtualList } from '@/components/base'
 import { useProxySelection } from '@/hooks/use-proxy-selection'
 import { useVerge } from '@/hooks/use-verge'
 import type { DelayUpdate } from '@/services/delay'
 import delayManager from '@/services/delay'
+import {
+  DEFAULT_LATENCY_TEST_URL,
+  testGroupDelay,
+} from '@/services/group-delay'
 
 interface Props {
   open: boolean
@@ -41,8 +44,6 @@ interface Props {
   onSelected: () => void
   onClose: () => void
 }
-
-const DEFAULT_LATENCY_URL = 'http://cp.cloudflare.com/generate_204'
 
 const delayColor = (delay: number) => {
   const color = delayManager.formatDelayColor(delay)
@@ -74,7 +75,7 @@ const NodeRow = ({
 
   useEffect(() => {
     delayManager.setListener(proxy.name, group, setDelayState)
-    return () => delayManager.removeListener(proxy.name, group)
+    return () => delayManager.removeListener(proxy.name, group, setDelayState)
   }, [proxy.name, group])
 
   useEffect(() => {
@@ -201,7 +202,7 @@ export const MinimalNodeDialog = ({
 
   useEffect(() => {
     if (!currentGroup) return
-    const url = verge?.default_latency_test?.trim() || DEFAULT_LATENCY_URL
+    const url = verge?.default_latency_test?.trim() || DEFAULT_LATENCY_TEST_URL
     delayManager.setUrl(currentGroup.name, url)
   }, [currentGroup, verge?.default_latency_test])
 
@@ -221,26 +222,9 @@ export const MinimalNodeDialog = ({
     if (!currentGroup) return
     setTesting(true)
     try {
-      const providers = new Set(
-        proxyList.map((proxy) => proxy.provider).filter(Boolean) as string[],
-      )
-      if (providers.size > 0) {
-        await Promise.allSettled(
-          [...providers].map((provider) => healthcheckProxyProvider(provider)),
-        )
-      }
-
-      const names = proxyList
-        .filter((proxy) => !proxy.provider)
-        .map((proxy) => proxy.name)
-      const url = delayManager.getUrl(currentGroup.name)
-
-      if (names.length > 0) {
-        await Promise.race([
-          delayManager.checkListDelay(names, currentGroup.name, timeout),
-          delayGroup(currentGroup.name, url, timeout),
-        ])
-      }
+      const url =
+        verge?.default_latency_test?.trim() || DEFAULT_LATENCY_TEST_URL
+      await testGroupDelay(currentGroup.name, proxyList, timeout, url).race
     } catch (error) {
       console.error('[MinimalNodeDialog] 延迟测试失败:', error)
     } finally {

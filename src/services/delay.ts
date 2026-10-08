@@ -1,8 +1,15 @@
-import { delayProxyByName, ProxyDelay } from 'tauri-plugin-mihomo-api'
+import { delayProxyByName, type ProxyDelay } from 'tauri-plugin-mihomo-api'
 
 import { debugLog } from '@/utils/debug'
 
 const hashKey = (name: string, group: string) => `${group ?? ''}::${name}`
+
+// 配置里的超时可能是 null。默认参数只在传入 undefined 时生效，
+// null 会在数值比较里被当成 0，于是任意正常延迟都满足 delay >= timeout。
+const normalizeLatencyTimeout = (timeout: number | null | undefined) =>
+  typeof timeout === 'number' && Number.isFinite(timeout) && timeout > 0
+    ? timeout
+    : 10000
 
 export interface DelayUpdate {
   delay: number
@@ -16,8 +23,10 @@ class DelayManager {
   private cache = new Map<string, DelayUpdate>()
   private urlMap = new Map<string, string>()
 
-  // 每个节点的监听
-  private listenerMap = new Map<string, (update: DelayUpdate) => void>()
+  // 每个节点的监听。使用 Set 支持同一「组::节点」被多处同时订阅
+  // （首页当前节点卡片、节点弹窗的行、代理页的条目），
+  // 避免后注册者覆盖先注册者，或其中一个组件卸载时误删其它组件的监听。
+  private listenerMap = new Map<string, Set<(update: DelayUpdate) => void>>()
 
   // 每个分组的监听
   private groupListenerMap = new Map<string, () => void>()
@@ -37,18 +46,20 @@ class DelayManager {
       this.pendingItemUpdates = new Map()
 
       updates.forEach((queue, key) => {
-        const listener = this.listenerMap.get(key)
-        if (!listener) return
+        const listeners = this.listenerMap.get(key)
+        if (!listeners || listeners.size === 0) return
 
         queue.forEach((update) => {
-          try {
-            listener(update)
-          } catch (error) {
-            console.error(
-              `[DelayManager] 通知节点延迟监听器失败: ${key}`,
-              error,
-            )
-          }
+          listeners.forEach((listener) => {
+            try {
+              listener(update)
+            } catch (error) {
+              console.error(
+                `[DelayManager] 通知节点延迟监听器失败: ${key}`,
+                error,
+              )
+            }
+          })
         })
       })
     }
@@ -129,12 +140,27 @@ class DelayManager {
     listener: (update: DelayUpdate) => void,
   ) {
     const key = hashKey(name, group)
-    this.listenerMap.set(key, listener)
+    const listeners = this.listenerMap.get(key)
+    if (listeners) {
+      listeners.add(listener)
+    } else {
+      this.listenerMap.set(key, new Set([listener]))
+    }
   }
 
-  removeListener(name: string, group: string) {
+  removeListener(
+    name: string,
+    group: string,
+    listener: (update: DelayUpdate) => void,
+  ) {
     const key = hashKey(name, group)
-    this.listenerMap.delete(key)
+    const listeners = this.listenerMap.get(key)
+    if (!listeners) return
+
+    listeners.delete(listener)
+    if (listeners.size === 0) {
+      this.listenerMap.delete(key)
+    }
   }
 
   setGroupListener(group: string, listener: () => void) {
@@ -326,16 +352,18 @@ class DelayManager {
   }
 
   formatDelay(delay: number, timeout = 10000) {
+    const limit = normalizeLatencyTimeout(timeout)
     if (delay === -1) return '-'
     if (delay === -2) return 'testing'
-    if (delay === 0 || (delay >= timeout && delay <= 1e5)) return 'Timeout'
+    if (delay === 0 || (delay >= limit && delay <= 1e5)) return 'Timeout'
     if (delay > 1e5) return 'Error'
     return `${delay}`
   }
 
   formatDelayColor(delay: number, timeout = 10000) {
+    const limit = normalizeLatencyTimeout(timeout)
     if (delay < 0) return ''
-    if (delay === 0 || delay >= timeout) return 'error.main'
+    if (delay === 0 || delay >= limit) return 'error.main'
     if (delay >= 10000) return 'error.main'
     if (delay >= 400) return 'warning.main'
     if (delay >= 250) return 'primary.main'

@@ -65,7 +65,7 @@ export const ProxyItem = (props: Props) => {
     delayManager.setListener(proxy.name, group.name, setDelayState)
 
     return () => {
-      delayManager.removeListener(proxy.name, group.name)
+      delayManager.removeListener(proxy.name, group.name, setDelayState)
     }
   }, [proxy.name, group.name, isPreset])
 

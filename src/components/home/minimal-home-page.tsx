@@ -15,7 +15,6 @@ import {
   IconButton,
   Menu,
   MenuItem,
-  Tooltip,
   Typography,
   alpha,
   useTheme,
@@ -43,8 +42,14 @@ import { useVerge } from '@/hooks/use-verge'
 import { useAppData } from '@/providers/app-data-context'
 import { patchClashMode } from '@/services/cmds'
 import delayManager from '@/services/delay'
+import type { DelayUpdate } from '@/services/delay'
+import {
+  DEFAULT_LATENCY_TEST_URL,
+  testGroupDelay,
+} from '@/services/group-delay'
 import { showNotice } from '@/services/notice-service'
 import type { TranslationKey } from '@/types/generated/i18n-keys'
+import { version } from '@root/package.json'
 
 interface Props {
   onSwitchToTraditional: () => void
@@ -53,11 +58,11 @@ interface Props {
 
 const BIG_BUTTON_SIZE = 220
 
-/** 未配置自定义测试地址时使用的默认延迟测试 URL，与节点弹窗保持一致 */
-const DEFAULT_LATENCY_TEST_URL = 'http://cp.cloudflare.com/generate_204'
-
 /** 后台自动检测的默认间隔（分钟），与传统首页 CurrentProxyCard 一致 */
 const AUTO_CHECK_DEFAULT_INTERVAL_MINUTES = 5
+/** 首次进入时的补测最大重试次数与间隔，用于覆盖内核尚未就绪的场景 */
+const AUTO_CHECK_MAX_RETRIES = 3
+const AUTO_CHECK_RETRY_DELAY_MS = 3000
 
 type ClashModeKey = 'rule' | 'global' | 'direct'
 
@@ -95,7 +100,7 @@ const MODE_LABEL_KEY: Record<ClashModeKey, TranslationKey> = {
  * - 中央大圆钮：开关当前选中的连接方式（系统代理 / 虚拟网卡）
  * - 连接方式选择：大圆钮下方切换系统代理与虚拟网卡，偏好持久化
  * - 切换节点：打开节点选择对话框
- * - 只读代理模式标签
+ * - 代理模式：右上角点击切换规则 / 全局 / 直连
  * - 汉堡菜单：切回传统风格与跳转其它页面
  */
 export const MinimalHome = ({
@@ -122,37 +127,34 @@ export const MinimalHome = ({
   const { tunEnabled, tunToggle } = useTunModeToggle()
   const [switching, setSwitching] = useState(false)
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null)
+  const [modeMenuAnchor, setModeMenuAnchor] = useState<HTMLElement | null>(null)
   const [nodeDialogOpen, setNodeDialogOpen] = useState(false)
 
-  // 用户选择的连接方式，持久化到 verge 配置；未知值兜底为 TUN（默认）
+  // 用户选择的连接方式，持久化到 verge 配置；未设置或未知取值默认系统代理
   const connectionMode: ConnectionMode =
-    verge?.home_connection_mode === 'system_proxy' ? 'system_proxy' : 'tun'
+    verge?.home_connection_mode === 'tun' ? 'tun' : 'system_proxy'
   const isTunMethod = connectionMode === 'tun'
 
-  // ---- 代理模式归一为「规则」 ----------------------------------------------
+  // ---- 代理模式 -------------------------------------------------------------
   const currentMode = clashConfig?.mode?.toLowerCase()
   const currentModeKey: ClashModeKey =
     currentMode === 'global' || currentMode === 'direct' ? currentMode : 'rule'
 
-  useEffect(() => {
-    // 内核数据未就绪时不误切；已经是 rule 时不重复请求
-    if (!currentMode || currentMode === 'rule') return
-    let disposed = false
+  const handleChangeMode = useLockFn(async (mode: ClashModeKey) => {
+    setModeMenuAnchor(null)
+    if (mode === currentModeKey) return
     // 与传统首页的模式卡片保持一致：用户开启了「切换代理时自动关闭连接」才清理连接
     if (verge?.auto_close_connection) {
       closeAllConnections().catch(() => {})
     }
-    void patchClashMode('rule')
-      .then(() => {
-        if (!disposed) refreshClashConfig()
-      })
-      .catch((error) => {
-        console.error('[MinimalHome] 归一代理模式为规则失败:', error)
-      })
-    return () => {
-      disposed = true
+    try {
+      await patchClashMode(mode)
+      refreshClashConfig()
+    } catch (error) {
+      console.error('[MinimalHome] 切换代理模式失败:', error)
+      showNotice.error(error)
     }
-  }, [currentMode, refreshClashConfig, verge?.auto_close_connection])
+  })
 
   // ---- 当前节点 -------------------------------------------------------------
   const groups = useMemo<IProxyGroupItem[]>(
@@ -197,10 +199,6 @@ export const MinimalHome = ({
     -1,
   )
 
-  // 立即检测去重：同一「组::节点」只自动测一次，避免 proxies 数据刷新导致
-  // 反复重测（节点不通时结果为 0，若不 guard 会随每次刷新再次触发）。
-  const autoCheckedRef = useRef<string | null>(null)
-
   // 自动延迟检测：复用设置页的开关与间隔（默认关闭，间隔 5 分钟），
   // 与传统首页 CurrentProxyCard 保持同一份配置语义。
   const autoDelayEnabled = verge?.enable_auto_delay_detection ?? false
@@ -213,26 +211,36 @@ export const MinimalHome = ({
     return Math.max(1, Math.round(intervalMinutes)) * 60 * 1000
   }, [verge?.auto_delay_detection_interval_minutes])
 
-  // 统一的当前节点延迟检测入口。
-  // 测试地址必须在检测前写入：checkDelay 经 getUrl 读取按组记录的 URL，未设置
-  // 时会回退到内置地址；若该地址不可达，结果会被记为 0 并显示为 Timeout。
-  // 节点弹窗同样是先 setUrl 再测，这里与其保持一致。
-  const runDelayCheck = useCallback(() => {
-    if (!activeProxyName || !activeGroupName) return
-    delayManager.setUrl(
-      activeGroupName,
-      verge?.default_latency_test?.trim() || DEFAULT_LATENCY_TEST_URL,
-    )
+  // 节点列表用 ref 持有最新值，避免代理数据刷新改变回调身份、反复重开自动检测。
+  const groupProxiesRef = useRef<IProxyItem[]>([])
+  useEffect(() => {
+    groupProxiesRef.current = activeGroup?.all ?? []
+  }, [activeGroup])
+
+  // 自动检测与弹窗「测试全部」走同一条链路：测当前组的全部节点。
+  // 每个节点的结果写入 delayManager 缓存并通知订阅，首页只展示当前节点那一条。
+  const runDelayCheck = useCallback(async () => {
+    const groupName = activeGroupName
+    const proxies = groupProxiesRef.current
+    if (!groupName || proxies.length === 0) return
     const timeout = verge?.default_latency_timeout || 10000
-    delayManager
-      .checkDelay(activeProxyName, activeGroupName, timeout)
-      .catch(() => {})
+    const url = verge?.default_latency_test?.trim() || DEFAULT_LATENCY_TEST_URL
+    try {
+      await testGroupDelay(groupName, proxies, timeout, url).list
+    } catch (error) {
+      console.error('[MinimalHome] 延迟测试失败:', error)
+    }
   }, [
     activeGroupName,
-    activeProxyName,
     verge?.default_latency_test,
     verge?.default_latency_timeout,
   ])
+
+  // 稳定的延迟回调：removeListener 需按引用精确移除自己的订阅，
+  // 内联箭头函数每次渲染都会重建，会导致注销失败。
+  const handleDelayUpdate = useCallback((next: DelayUpdate) => {
+    setActiveDelay(next.delay)
+  }, [])
 
   // 订阅当前节点的延迟结果
   useEffect(() => {
@@ -247,30 +255,63 @@ export const MinimalHome = ({
         activeGroupName,
       ),
     )
-    delayManager.setListener(activeProxyName, activeGroupName, (next) =>
-      setActiveDelay(next.delay),
+    delayManager.setListener(
+      activeProxyName,
+      activeGroupName,
+      handleDelayUpdate,
     )
 
-    return () => delayManager.removeListener(activeProxyName, activeGroupName)
-  }, [activeProxy, activeGroupName, activeProxyName])
+    return () =>
+      delayManager.removeListener(
+        activeProxyName,
+        activeGroupName,
+        handleDelayUpdate,
+      )
+  }, [activeProxy, activeGroupName, activeProxyName, handleDelayUpdate])
 
-  // 进入首页或切换节点时补测一次：无缓存覆盖首屏从未测过的情况，
-  // 缓存为 0 则让订阅遗留的陈旧超时能自动恢复。
+  // 进入首页或切换节点时按「测试全部」补测整组：无缓存覆盖首屏从未测过的情况，
+  // 缓存为 0 则让订阅遗留的陈旧超时能自动恢复。首页只订阅当前节点，该节点一测完就更新。
+  // 结果若仍为超时（0），按固定间隔重试有限次——覆盖启动初期内核尚未就绪导致
+  // 首次检测必然失败的情况；有上限，不会无休止重试。
   useEffect(() => {
     if (!activeProxyName || !activeGroupName) return
 
-    const testKey = `${activeGroupName}::${activeProxyName}`
-    const cachedDelay = delayManager.getDelayUpdate(
-      activeProxyName,
-      activeGroupName,
-    )?.delay
+    const hasUsableDelay = (() => {
+      const cached = delayManager.getDelayUpdate(
+        activeProxyName,
+        activeGroupName,
+      )?.delay
+      return cached !== undefined && cached !== 0
+    })()
 
-    if (
-      (cachedDelay === undefined || cachedDelay === 0) &&
-      autoCheckedRef.current !== testKey
-    ) {
-      autoCheckedRef.current = testKey
-      runDelayCheck()
+    if (hasUsableDelay) return
+
+    let disposed = false
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
+    let attempt = 0
+
+    const attemptCheck = async () => {
+      if (disposed) return
+      await runDelayCheck()
+      if (disposed) return
+      attempt += 1
+      if (attempt > AUTO_CHECK_MAX_RETRIES) return
+      // 已拿到有效结果就不再重试（可能是其它页面/弹窗测出来的）
+      const current = delayManager.getDelayUpdate(
+        activeProxyName,
+        activeGroupName,
+      )?.delay
+      if (current !== undefined && current !== 0) return
+      retryTimer = setTimeout(() => {
+        void attemptCheck()
+      }, AUTO_CHECK_RETRY_DELAY_MS)
+    }
+
+    void attemptCheck()
+
+    return () => {
+      disposed = true
+      if (retryTimer) clearTimeout(retryTimer)
     }
   }, [activeGroupName, activeProxyName, runDelayCheck])
 
@@ -282,9 +323,10 @@ export const MinimalHome = ({
     let disposed = false
     let intervalTimer: ReturnType<typeof setTimeout> | null = null
 
-    const runAndSchedule = () => {
+    const runAndSchedule = async () => {
       if (disposed) return
-      runDelayCheck()
+      await runDelayCheck()
+      if (disposed) return
       intervalTimer = setTimeout(runAndSchedule, autoDelayIntervalMs)
     }
 
@@ -304,7 +346,10 @@ export const MinimalHome = ({
 
   const delayText =
     activeProxy && activeProxyName
-      ? delayManager.formatDelay(activeDelay, verge?.default_latency_timeout)
+      ? delayManager.formatDelay(
+          activeDelay,
+          verge?.default_latency_timeout || 10000,
+        )
       : ''
 
   // ---- 连接开关（系统代理 / 虚拟网卡） ----------------------------------------
@@ -443,19 +488,28 @@ export const MinimalHome = ({
           >
             <MenuRounded />
           </IconButton>
-          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-            {t('home.minimal.title')}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              {t('home.minimal.title')}
+            </Typography>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ fontWeight: 500, lineHeight: 1 }}
+            >
+              v{version}
+            </Typography>
+          </Box>
         </Box>
 
-        <Tooltip title={t('home.minimal.mode.label')}>
-          <Chip
-            size="small"
-            variant="outlined"
-            label={`${t('home.minimal.mode.label')} · ${t(MODE_LABEL_KEY[currentModeKey])}`}
-            sx={{ fontWeight: 500, pointerEvents: 'auto' }}
-          />
-        </Tooltip>
+        <Chip
+          size="small"
+          variant="outlined"
+          clickable
+          label={`${t('home.minimal.mode.label')} · ${t(MODE_LABEL_KEY[currentModeKey])}`}
+          onClick={(event) => setModeMenuAnchor(event.currentTarget)}
+          sx={{ fontWeight: 500, pointerEvents: 'auto' }}
+        />
       </Box>
 
       {/* 当前订阅信息（名称 / 剩余流量 / 到期时间），只读 */}
@@ -721,6 +775,25 @@ export const MinimalHome = ({
           </Button>
         </Box>
       </Box>
+
+      <Menu
+        anchorEl={modeMenuAnchor}
+        open={Boolean(modeMenuAnchor)}
+        onClose={() => setModeMenuAnchor(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+        transitionDuration={200}
+      >
+        {(['rule', 'global', 'direct'] as const).map((mode) => (
+          <MenuItem
+            key={mode}
+            selected={mode === currentModeKey}
+            onClick={() => void handleChangeMode(mode)}
+          >
+            {t(MODE_LABEL_KEY[mode])}
+          </MenuItem>
+        ))}
+      </Menu>
 
       {/* 汉堡菜单 */}
       <Menu

@@ -155,8 +155,10 @@ pub struct IVerge {
     pub home_style: Option<String>,
 
     /// 简洁首页的连接方式
-    /// `tun`（默认）| `system_proxy`
-    /// 决定简洁首页大圆钮开关的是虚拟网卡还是系统代理，未知取值按 `tun` 处理
+    /// `system_proxy`（默认）| `tun`
+    /// 决定简洁首页大圆钮开关的是系统代理还是虚拟网卡。
+    /// 新装用户由 `first_run_template` 写入 `system_proxy`；
+    /// 老配置缺省或未知取值时前端也按系统代理处理，显式保存过 `tun` 的保持虚拟网卡。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub home_connection_mode: Option<String>,
 
@@ -409,6 +411,8 @@ impl IVerge {
             auto_launch_pending: Some(true),
             // 新装用户默认简洁首页；老用户配置里无此字段，前端按 traditional 处理
             home_style: Some("minimal".into()),
+            // 新装用户默认系统代理；老用户若显式保存过 tun 则不受影响
+            home_connection_mode: Some("system_proxy".into()),
             ..Self::template()
         }
     }
@@ -684,6 +688,14 @@ mod tests {
         assert_eq!(config.home_style.as_deref(), Some("minimal"));
         // 恢复模板保持 None：老配置/恢复场景不会被强切成简洁风格
         assert_eq!(IVerge::template().home_style, None);
+    }
+
+    #[test]
+    fn first_run_defaults_to_system_proxy_connection_mode() {
+        let config = IVerge::first_run_template();
+        assert_eq!(config.home_connection_mode.as_deref(), Some("system_proxy"));
+        // 恢复模板保持 None，避免读配置失败时改写用户已有选择
+        assert_eq!(IVerge::template().home_connection_mode, None);
     }
 
     #[test]

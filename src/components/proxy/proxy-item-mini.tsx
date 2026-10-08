@@ -40,7 +40,7 @@ export const ProxyItemMini = (props: Props) => {
     delayManager.setListener(proxy.name, group.name, setDelayState)
 
     return () => {
-      delayManager.removeListener(proxy.name, group.name)
+      delayManager.removeListener(proxy.name, group.name, setDelayState)
     }
   }, [isPreset, proxy.name, group.name])
 
